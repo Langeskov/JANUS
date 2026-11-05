@@ -1,0 +1,47 @@
+# JANUS Phase 0 - documentation of the 2026-07-06 rule baseline switch.
+#
+# This file is documentation, not loadable rule data: the registry only reads
+# `ruleset_*.yaml`, `fees_*.yaml` and `calendar_*.yaml` documents. It records which
+# baseline superseded which, when, and on what source, because Phase 0 must not
+# silently assume a 2023 rule description remains current (spec s2.3).
+
+switch:
+  switch_id: CN-RULES-2026-07-06
+  effective_from: 2026-07-06T00:00:00+08:00
+  published_at: 2026-04-24T00:00:00+08:00
+  supersedes:
+    rule_set_id: CN-SSE-SZSE-2023.1
+    version: "2023.1"
+    effective_to: 2026-07-06T00:00:00+08:00
+  replaced_by:
+    rule_set_id: CN-SSE-SZSE-2026.1
+    version: "2026.1"
+    effective_from: 2026-07-06T00:00:00+08:00
+  reason: >-
+    The SSE and SZSE 2026 revised trading rules were published 2026-04-24 and take
+    effect 2026-07-06. Phase 0 registers the post-revision baseline as the ACTIVE
+    rule-set and keeps the earlier conservative baseline as a SUPERSEDED replay
+    baseline so effective-date selection is exercised and audit lineage is
+    reproducible.
+  source_refs:
+    - "https://www.sse.com.cn/lawandrules/sselawsrules2025/trade/universal/c/c_20260424_10816492.shtml"
+    - "https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml"
+    - "https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20260424_10816474.shtml"
+    - "https://www.szse.cn/lawrules/rule/trade/current/t20260424_620190.html"
+  delayed_provisions:
+    - provision: after-hours fixed-price trading expansion to A-shares and ETFs
+      phase0_treatment: >-
+        NOT simulated. No after-hours session is declared in the calendar or the
+        rule-set, so an order needing that session fails closed instead of being
+        filled under invented rules.
+    - provision: closing-auction / closing-price treatment changes
+      phase0_treatment: >-
+        NOT simulated beyond an explicit 14:57-15:00 CLOSING_AUCTION session
+        window; Phase 0 does not model auction order books or closing-price
+        determination.
+    - provision: main-board risk-warning stock price-limit percentage change
+      phase0_treatment: >-
+        Configured at 5% for both main boards as an ESTIMATED baseline. The exact
+        official percentage and any delayed implementation must be verified
+        against the spec s16 notices before Phase 1; see
+        docs/market_rules/2026_baseline.md.

@@ -1,0 +1,41 @@
+# Independent risk-controller policy (Phase 0 spec sections 8 and 13).
+#
+# This file is READ-ONLY to every agent. Changing it requires human review
+# (`controls.require_human_for_policy_change`). The controller is ordinary
+# deterministic code -- never an LLM prompt.
+#
+# The limits below are conservative DEVELOPMENT SIMULATOR defaults whose purpose
+# is to exercise the risk-control paths. They are not personalised financial
+# advice and must be explicitly reviewed before any future live-trading phase.
+version: 0.1.0
+
+execution:
+  environment: paper_only
+  allow_short: false
+  allow_leverage: false
+  allow_derivatives: false
+  allow_intraday_strategy: false
+
+controls:
+  require_fresh_market_data: true
+  require_known_ruleset: true
+  require_decision_reference: true
+  require_human_for_policy_change: true
+  pause_on_data_integrity_failure: true
+  # A daily bar older than this many calendar days is stale and cannot back an
+  # order. The simulator is daily-frequency, so a small window is intentional.
+  max_bar_age_days: 5
+  max_quote_age_seconds: 300
+
+limits:
+  max_single_instrument_weight: 0.10   # development default; tune only through reviewed config
+  max_daily_turnover: 0.20             # fraction of NAV; development default
+  min_cash_weight: 0.20                # development default
+  max_orders_per_day: 5                # development default
+  max_gross_exposure: 0.80             # development default
+  max_sector_weight: 0.40              # development default
+  max_order_notional: null             # optional absolute CNY cap per order
+
+drawdown:
+  pause_new_orders_at: 0.10            # development test threshold, not forced liquidation
+  liquidation_on_trigger: false

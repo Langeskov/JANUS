@@ -1,0 +1,242 @@
+# JANUS Phase 0 - deterministic trading calendar (spec s2.2, s2.3, P0-D).
+#
+# The calendar is DATA, not logic: it is loaded from versioned configuration and
+# every session is explicit. Phase 0 does not simulate every session type; a
+# session that is not declared here makes an order fail closed rather than being
+# filled under invented hours.
+#
+# COVERAGE AND ASSUMPTIONS
+# - Coverage: 2026-07-06 .. 2026-12-31. Every date in that window is listed, so a
+#   date inside coverage can never fall through a gap.
+# - The coverage starts exactly where the ACTIVE rule-set CN-SSE-SZSE-2026.1 takes
+#   effect. This is deliberate: any trade date selectable under the ACTIVE rule
+#   set is also calendar-covered, and the window contains at least 60 trading days
+#   before the Phase 0 reference date (2026-11-05) so the seasoned-listing
+#   eligibility check can be evaluated from coverage alone.
+# - The 2026 official PRC holiday schedule has NOT been verified against the State
+#   Council / exchange notices for this Phase 0 build. Holiday closures are marked
+#   `PRC_HOLIDAY_ASSUMED`; ordinary weekdays are marked
+#   `PRC_WEEKDAY_TRADING_RULE`; weekends are marked `WEEKEND_RULE`.
+# - Assumed holiday closures in this window: 2026-09-25 (Mid-Autumn, Friday) and
+#   the weekday dates of the National Day golden week 2026-10-01..2026-10-07.
+#   No PRC statutory holiday falls in July/August, so those weekdays are ordinary
+#   trading days under the weekday rule (still subject to official verification).
+# - Exchanges are closed on Saturdays/Sundays even when a make-up working day is
+#   declared, so weekend trading is not modelled.
+# - AFTER_HOURS_FIXED_PRICE (15:05-15:30) is NOT modelled (spec s2.3, P0-D): an
+#   order that requires it fails closed.
+#
+# Trade dates before 2026-07-06 are covered by the SUPERSEDED replay rule-set
+# CN-SSE-SZSE-2023.1 but deliberately NOT by this calendar: Phase 0 has no
+# verified historical trading calendar, so replay of older dates fails closed
+# until one is registered.
+#
+# The same data is mirrored as JSON under data/fixtures/calendar/ for tests.
+
+calendar:
+  calendar_id: CN-2026-H2
+  version: "2026.2"
+  coverage_from: 2026-07-06
+  coverage_to: 2026-12-31
+  source_refs:
+    - "JANUS Phase 0 spec s2.2/s2.3 (calendar is data; sessions explicit); s16 for the exchange rule references"
+  notes: >-
+    Deterministic Phase 0 fixture calendar. Holiday closures are ASSUMED from the
+    statutory PRC holiday pattern and are NOT verified against the 2026 official
+    notice; replace with an official exchange calendar before Phase 1. Weekdays
+    outside the assumed holidays are treated as trading days with the explicit
+    Phase 0 sessions declared above. Coverage begins at the 2026-07-06 rule
+    baseline; older trade dates are intentionally not covered.
+  default_sessions:
+    - session_type: PRE_OPEN_AUCTION
+      start_time: "09:15:00"
+      end_time: "09:25:00"
+    - session_type: CONTINUOUS
+      start_time: "09:30:00"
+      end_time: "11:30:00"
+    - session_type: CONTINUOUS
+      start_time: "13:00:00"
+      end_time: "14:57:00"
+    - session_type: CLOSING_AUCTION
+      start_time: "14:57:00"
+      end_time: "15:00:00"
+  days:
+    - {date: 2026-07-06, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-07, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-08, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-09, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-10, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-11, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-07-12, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-07-13, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-14, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-15, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-16, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-17, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-18, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-07-19, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-07-20, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-21, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-22, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-23, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-24, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-25, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-07-26, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-07-27, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-28, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-29, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-30, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-07-31, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-01, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-08-02, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-08-03, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-04, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-05, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-06, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-07, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-08, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-08-09, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-08-10, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-11, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-12, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-13, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-14, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-15, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-08-16, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-08-17, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-18, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-19, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-20, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-21, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-22, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-08-23, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-08-24, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-25, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-26, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-27, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-28, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-08-29, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-08-30, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-08-31, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-01, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-02, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-03, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-04, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-05, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-09-06, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-09-07, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-08, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-09, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-10, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-11, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-12, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-09-13, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-09-14, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-15, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-16, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-17, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-18, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-19, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-09-20, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-09-21, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-22, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-23, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-24, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-25, day_type: HOLIDAY, source: PRC_HOLIDAY_ASSUMED}
+    - {date: 2026-09-26, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-09-27, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-09-28, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-29, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-09-30, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-01, day_type: HOLIDAY, source: PRC_HOLIDAY_ASSUMED}
+    - {date: 2026-10-02, day_type: HOLIDAY, source: PRC_HOLIDAY_ASSUMED}
+    - {date: 2026-10-03, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-10-04, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-10-05, day_type: HOLIDAY, source: PRC_HOLIDAY_ASSUMED}
+    - {date: 2026-10-06, day_type: HOLIDAY, source: PRC_HOLIDAY_ASSUMED}
+    - {date: 2026-10-07, day_type: HOLIDAY, source: PRC_HOLIDAY_ASSUMED}
+    - {date: 2026-10-08, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-09, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-10, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-10-11, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-10-12, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-13, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-14, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-15, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-16, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-17, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-10-18, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-10-19, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-20, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-21, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-22, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-23, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-24, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-10-25, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-10-26, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-27, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-28, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-29, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-30, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-10-31, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-11-01, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-11-02, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-03, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-04, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-05, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-06, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-07, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-11-08, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-11-09, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-10, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-11, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-12, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-13, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-14, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-11-15, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-11-16, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-17, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-18, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-19, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-20, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-21, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-11-22, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-11-23, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-24, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-25, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-26, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-27, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-11-28, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-11-29, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-11-30, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-01, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-02, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-03, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-04, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-05, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-12-06, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-12-07, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-08, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-09, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-10, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-11, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-12, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-12-13, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-12-14, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-15, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-16, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-17, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-18, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-19, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-12-20, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-12-21, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-22, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-23, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-24, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-25, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-26, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-12-27, day_type: WEEKEND, source: WEEKEND_RULE}
+    - {date: 2026-12-28, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-29, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-30, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}
+    - {date: 2026-12-31, day_type: TRADING, source: PRC_WEEKDAY_TRADING_RULE}

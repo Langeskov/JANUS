@@ -1,0 +1,31 @@
+# Provider configuration (Phase 0 spec sections 7 and 13).
+#
+# Phase 0 uses deterministic local fixtures only. Live data and live LLM calls
+# are Phase 1 decisions with explicit permission/cost review; the adapters below
+# are disabled shells. Secrets are referenced by ENVIRONMENT VARIABLE NAME only
+# and are never read from this file.
+market_data:
+  primary: fixture
+  enabled:
+    - fixture
+  providers:
+    fixture:
+      enabled: true
+      fixture_dir: data/fixtures
+    tushare:
+      enabled: false
+      token_env: TUSHARE_TOKEN
+      note: "Phase 1. Daily data requires Tushare points; minute/news need separate permissions."
+    akshare:
+      enabled: false
+      mode: research_only
+      note: "Optional cross-check only; public-source data with commercial-use caveats."
+
+llm:
+  enabled: false
+  provider: deepseek_compatible
+  api_key_env: DEEPSEEK_API_KEY
+  execution_tools_enabled: false
+  model_id: deepseek-chat
+  prompt_version: research_agent_v0_1_0
+  note: "Phase 0 ships a stub fixture agent; no live model calls are made."

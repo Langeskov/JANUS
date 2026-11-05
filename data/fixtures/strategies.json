@@ -1,0 +1,61 @@
+[
+  {
+    "strategy_id": "cash_defensive",
+    "version": "0.1.0",
+    "name": "Cash Defensive",
+    "description": "Hold primarily cash when risk conditions are unfavourable. Phase 0 contract-only baseline.",
+    "status": "REGISTERED",
+    "rebalance_cadence_days": 20,
+    "requires_min_history_days": 0,
+    "max_horizon_days": 20,
+    "parameter_bounds": {
+      "cash_floor": {"minimum": 0.5, "maximum": 1.0, "default": 0.9}
+    },
+    "eligible_instrument_types": ["A_SHARE", "DOMESTIC_EQUITY_ETF"],
+    "source_refs": ["spec:3.2"]
+  },
+  {
+    "strategy_id": "broad_etf_core",
+    "version": "0.1.0",
+    "name": "Broad ETF Core",
+    "description": "Broad-index domestic equity ETF allocation baseline. Phase 0 contract-only baseline.",
+    "status": "REGISTERED",
+    "rebalance_cadence_days": 20,
+    "requires_min_history_days": 250,
+    "max_horizon_days": 60,
+    "parameter_bounds": {
+      "equity_allocation": {"minimum": 0.0, "maximum": 0.8, "default": 0.5}
+    },
+    "eligible_instrument_types": ["DOMESTIC_EQUITY_ETF"],
+    "source_refs": ["spec:3.2"]
+  },
+  {
+    "strategy_id": "trend_following",
+    "version": "0.1.0",
+    "name": "Trend Following",
+    "description": "Low-frequency rule-based trend allocation. DISABLED in Phase 0 to exercise rejection paths.",
+    "status": "DISABLED",
+    "rebalance_cadence_days": 20,
+    "requires_min_history_days": 250,
+    "max_horizon_days": 60,
+    "parameter_bounds": {
+      "lookback_days": {"minimum": 20, "maximum": 250, "default": 120}
+    },
+    "eligible_instrument_types": ["A_SHARE", "DOMESTIC_EQUITY_ETF"],
+    "source_refs": ["spec:3.2"]
+  },
+  {
+    "strategy_id": "benchmark_hold",
+    "version": "0.1.0",
+    "name": "Benchmark Hold",
+    "description": "Buy-and-hold comparison baseline; not an active strategy.",
+    "status": "REGISTERED",
+    "rebalance_cadence_days": 250,
+    "requires_min_history_days": 250,
+    "max_horizon_days": 250,
+    "parameter_bounds": {},
+    "eligible_instrument_types": ["A_SHARE", "DOMESTIC_EQUITY_ETF"],
+    "is_benchmark": true,
+    "source_refs": ["spec:3.2"]
+  }
+]

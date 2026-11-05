@@ -1,0 +1,237 @@
+# JANUS Phase 0 - pre-2026-07-06 replay baseline rule-set (P0-D).
+#
+# Purpose: effective-date selection is only meaningful if a *previous* baseline is
+# actually registered. This rule-set covers trade dates from 2023-01-01 up to the
+# moment the 2026 revision took effect (2026-07-06T00:00+08:00) and is retained so
+# historical paper decisions can be replayed with their own rule-set reference
+# (spec s2.3, acceptance criterion 9).
+#
+# HONESTY NOTE: the 2023 SSE/SZSE rule text was not re-verified for this Phase 0
+# build, so this document deliberately does NOT claim to reproduce it. It reuses
+# the conservative Phase 0 profile grid (10% main-board limit, 0.01 stock tick,
+# 0.001 ETF tick, 100-share buy lots, T+1) as a replay baseline. Replace it with
+# verified historical rule-sets before any historical-rule research; until then
+# it must only be used to exercise effective-date switching and audit lineage.
+#
+# The T+0 symbol fixture (510999.SH) and the new-listing no-limit profiles are
+# TEST-ONLY rule fixtures, identical in intent to the 2026 baseline.
+
+rule_set:
+  rule_set_id: CN-SSE-SZSE-2023.1
+  version: "2023.1"
+  market: CN
+  status: SUPERSEDED
+  effective_from: 2023-01-01T00:00:00+08:00
+  effective_to: 2026-07-06T00:00:00+08:00
+  published_at: null
+  published_by: "JANUS Phase 0 replay baseline (not an official publication record)"
+  source_refs: []
+  notes: >-
+    Phase 0 replay baseline for trade dates before 2026-07-06. NOT a verified
+    reconstruction of the 2023 SSE/SZSE rule text: it reuses the same conservative
+    Phase 0 profile grid as CN-SSE-SZSE-2026.1 so effective-date selection and
+    rule-set lineage can be exercised offline. Fee schedules are shared with the
+    2026 baseline and are ESTIMATED for both windows. The 2023 revision history
+    must be sourced and verified before this baseline is used for research.
+  default_sessions:
+    - session_type: PRE_OPEN_AUCTION
+      start_time: "09:15:00"
+      end_time: "09:25:00"
+    - session_type: CONTINUOUS
+      start_time: "09:30:00"
+      end_time: "11:30:00"
+    - session_type: CONTINUOUS
+      start_time: "13:00:00"
+      end_time: "14:57:00"
+    - session_type: CLOSING_AUCTION
+      start_time: "14:57:00"
+      end_time: "15:00:00"
+  fee_schedule_ids:
+    - CN-EQUITY-DEFAULT
+    - CN-ETF-DEFAULT
+  profiles:
+    - profile_id: SSE_MAIN-A_SHARE
+      description: >-
+        SSE main-board A-share replay baseline: T+1 settlement, 0.01 CNY tick,
+        10% daily price limit, 100-share buy increment/minimum.
+      exchange: SSE
+      board: SSE_MAIN
+      instrument_type: A_SHARE
+      risk_warning_only: false
+      settlement_rule: T_PLUS_1
+      tick_size: "0.01"
+      price_limit_pct: "0.10"
+      risk_warning_price_limit_pct: null
+      no_price_limit_reason: null
+      buy_quantity_increment: 100
+      min_buy_quantity: 100
+      sell_quantity_increment: 1
+      odd_lot_sell_must_be_whole_position: true
+      allowed_order_types: [LIMIT]
+      allowed_validities: [DAY]
+      fee_schedule_id: CN-EQUITY-DEFAULT
+    - profile_id: SZSE_MAIN-A_SHARE
+      description: >-
+        SZSE main-board A-share replay baseline: T+1 settlement, 0.01 CNY tick,
+        10% daily price limit, 100-share buy increment/minimum.
+      exchange: SZSE
+      board: SZSE_MAIN
+      instrument_type: A_SHARE
+      risk_warning_only: false
+      settlement_rule: T_PLUS_1
+      tick_size: "0.01"
+      price_limit_pct: "0.10"
+      risk_warning_price_limit_pct: null
+      no_price_limit_reason: null
+      buy_quantity_increment: 100
+      min_buy_quantity: 100
+      sell_quantity_increment: 1
+      odd_lot_sell_must_be_whole_position: true
+      allowed_order_types: [LIMIT]
+      allowed_validities: [DAY]
+      fee_schedule_id: CN-EQUITY-DEFAULT
+    - profile_id: SSE_MAIN-A_SHARE-RISK-WARNING
+      description: >-
+        SSE main-board risk-warning (ST/*ST) A-share replay baseline: 5%
+        configured daily price limit, T+1, 0.01 tick, 100-share buy lot. The
+        historical percentage is unverified; do not use this for research.
+      exchange: SSE
+      board: SSE_MAIN
+      instrument_type: A_SHARE
+      risk_warning_only: true
+      settlement_rule: T_PLUS_1
+      tick_size: "0.01"
+      price_limit_pct: "0.05"
+      risk_warning_price_limit_pct: "0.05"
+      no_price_limit_reason: null
+      buy_quantity_increment: 100
+      min_buy_quantity: 100
+      sell_quantity_increment: 1
+      odd_lot_sell_must_be_whole_position: true
+      allowed_order_types: [LIMIT]
+      allowed_validities: [DAY]
+      fee_schedule_id: CN-EQUITY-DEFAULT
+    - profile_id: SZSE_MAIN-A_SHARE-RISK-WARNING
+      description: >-
+        SZSE main-board risk-warning (ST/*ST) A-share replay baseline: 5%
+        configured daily price limit, T+1, 0.01 tick, 100-share buy lot. The
+        historical percentage is unverified; do not use this for research.
+      exchange: SZSE
+      board: SZSE_MAIN
+      instrument_type: A_SHARE
+      risk_warning_only: true
+      settlement_rule: T_PLUS_1
+      tick_size: "0.01"
+      price_limit_pct: "0.05"
+      risk_warning_price_limit_pct: "0.05"
+      no_price_limit_reason: null
+      buy_quantity_increment: 100
+      min_buy_quantity: 100
+      sell_quantity_increment: 1
+      odd_lot_sell_must_be_whole_position: true
+      allowed_order_types: [LIMIT]
+      allowed_validities: [DAY]
+      fee_schedule_id: CN-EQUITY-DEFAULT
+    - profile_id: SSE_MAIN-EQUITY-ETF
+      description: >-
+        SSE main-board domestic equity ETF replay baseline: T+1 settlement,
+        0.001 CNY tick, 10% daily price limit, 100-unit buy lot.
+      exchange: SSE
+      board: SSE_MAIN
+      instrument_type: DOMESTIC_EQUITY_ETF
+      risk_warning_only: false
+      settlement_rule: T_PLUS_1
+      tick_size: "0.001"
+      price_limit_pct: "0.10"
+      risk_warning_price_limit_pct: null
+      no_price_limit_reason: null
+      buy_quantity_increment: 100
+      min_buy_quantity: 100
+      sell_quantity_increment: 1
+      odd_lot_sell_must_be_whole_position: true
+      allowed_order_types: [LIMIT]
+      allowed_validities: [DAY]
+      fee_schedule_id: CN-ETF-DEFAULT
+    - profile_id: SZSE_MAIN-EQUITY-ETF
+      description: >-
+        SZSE main-board domestic equity ETF replay baseline: T+1 settlement,
+        0.001 CNY tick, 10% daily price limit, 100-unit buy lot.
+      exchange: SZSE
+      board: SZSE_MAIN
+      instrument_type: DOMESTIC_EQUITY_ETF
+      risk_warning_only: false
+      settlement_rule: T_PLUS_1
+      tick_size: "0.001"
+      price_limit_pct: "0.10"
+      risk_warning_price_limit_pct: null
+      no_price_limit_reason: null
+      buy_quantity_increment: 100
+      min_buy_quantity: 100
+      sell_quantity_increment: 1
+      odd_lot_sell_must_be_whole_position: true
+      allowed_order_types: [LIMIT]
+      allowed_validities: [DAY]
+      fee_schedule_id: CN-ETF-DEFAULT
+    - profile_id: SSE_MAIN-EQUITY-ETF-T0-FIXTURE
+      description: >-
+        TEST-ONLY rule fixture: symbol-scoped T+0 settlement for 510999.SH
+        ("JANUS T+0 ETF FIXTURE"). Does not represent a real listed product.
+      symbols: ["510999.SH"]
+      exchange: SSE
+      board: SSE_MAIN
+      instrument_type: DOMESTIC_EQUITY_ETF
+      risk_warning_only: false
+      settlement_rule: T_PLUS_0
+      tick_size: "0.001"
+      price_limit_pct: "0.10"
+      risk_warning_price_limit_pct: null
+      no_price_limit_reason: null
+      buy_quantity_increment: 100
+      min_buy_quantity: 100
+      sell_quantity_increment: 1
+      odd_lot_sell_must_be_whole_position: true
+      allowed_order_types: [LIMIT]
+      allowed_validities: [DAY]
+      fee_schedule_id: CN-ETF-DEFAULT
+    - profile_id: SSE_MAIN-A_SHARE-NEW-LISTING
+      description: >-
+        SSE main-board A-share new-listing stage replay baseline: no daily price
+        limit (NEW_LISTING_NO_LIMIT_STAGE); selected only via explicit
+        new_listing_stage=True.
+      exchange: SSE
+      board: SSE_MAIN
+      instrument_type: A_SHARE
+      risk_warning_only: false
+      settlement_rule: T_PLUS_1
+      tick_size: "0.01"
+      price_limit_pct: null
+      risk_warning_price_limit_pct: null
+      no_price_limit_reason: NEW_LISTING_NO_LIMIT_STAGE
+      buy_quantity_increment: 100
+      min_buy_quantity: 100
+      sell_quantity_increment: 1
+      odd_lot_sell_must_be_whole_position: true
+      allowed_order_types: [LIMIT]
+      allowed_validities: [DAY]
+      fee_schedule_id: CN-EQUITY-DEFAULT
+    - profile_id: SZSE_MAIN-A_SHARE-NEW-LISTING
+      description: >-
+        SZSE main-board A-share new-listing stage replay baseline: no daily
+        price limit (NEW_LISTING_NO_LIMIT_STAGE); selected only via explicit
+        new_listing_stage=True.
+      exchange: SZSE
+      board: SZSE_MAIN
+      instrument_type: A_SHARE
+      risk_warning_only: false
+      settlement_rule: T_PLUS_1
+      tick_size: "0.01"
+      price_limit_pct: null
+      risk_warning_price_limit_pct: null
+      no_price_limit_reason: NEW_LISTING_NO_LIMIT_STAGE
+      buy_quantity_increment: 100
+      min_buy_quantity: 100
+      sell_quantity_increment: 1
+      odd_lot_sell_must_be_whole_position: true
+      allowed_order_types: [LIMIT]
+      allowed_validities: [DAY]
+      fee_schedule_id: CN-EQUITY-DEFAULT

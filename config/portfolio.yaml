@@ -1,0 +1,20 @@
+# JANUS paper-account configuration (Phase 0 spec section 13).
+#
+# The account is created exactly once with 100% cash. Phase 0 exposes no
+# deposits, withdrawals or manual balance edits: the only way to change capital
+# is an explicit administrative reset that creates a new account version and
+# preserves the old audit history.
+account:
+  id: janus-paper-cny-001
+  mode: paper
+  currency: CNY
+  initial_capital: 100000
+  initial_cash_ratio: 1.0
+  allow_external_flows: false
+  reset_requires_admin: true
+
+# Development simulator defaults. These are NOT personalised financial advice
+# and must be reviewed before any future live-trading phase.
+account_limits:
+  max_account_version: 1000
+  require_admin_for_reset: true

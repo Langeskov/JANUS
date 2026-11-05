@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep installs resilient on slow networks; database URLs are set per step so
+  # the test suite never inherits ambient configuration.
+  UV_HTTP_TIMEOUT: "120"
+
+jobs:
+  quality:
+    name: Lint, types, tests, migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.25"
+          enable-cache: true
+
+      - name: Install Python 3.12 and lockfile dependencies
+        run: |
+          uv python install 3.12
+          uv sync --locked --extra dev
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check .
+
+      - name: Type check (mypy)
+        run: uv run mypy
+
+      - name: Migration check (fresh database reaches head)
+        env:
+          JANUS_DB_URL: sqlite:///ci-janus.db
+        run: |
+          rm -f ci-janus.db
+          uv run alembic upgrade head
+          uv run python -m janus.infrastructure.database.schema_check --database-url "$JANUS_DB_URL"
+
+      - name: Tests (unit, contract, integration, simulation, security)
+        run: uv run pytest -q --cov=janus --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage artefact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+          if-no-files-found: ignore
+
+      - name: CLI health smoke test
+        run: |
+          uv run janus health
+          uv run janus init-account
+          uv run janus ingest-fixtures
+          uv run janus rebuild
+
+  domain-purity:
+    name: Domain layer imports no frameworks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.25"
+          enable-cache: true
+      - run: |
+          uv python install 3.12
+          uv sync --locked --extra dev
+      - name: Domain must stay framework-free
+        run: uv run pytest tests/unit/test_layering.py -q

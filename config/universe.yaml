@@ -1,0 +1,35 @@
+# Tradable-universe policy (Phase 0 spec sections 2.1 and 13).
+#
+# Phase 0 is a deliberately conservative engineering scope: Shanghai and
+# Shenzhen main-board A-shares plus domestic exchange-listed equity ETFs only.
+# Board/product support may be widened only after the corresponding rule and
+# data-coverage tests exist.
+market:
+  country: CN
+  exchanges: [SSE, SZSE]
+  boards: [SSE_MAIN, SZSE_MAIN]
+
+instruments:
+  include:
+    - A_SHARE
+    - DOMESTIC_EQUITY_ETF
+  exclude:
+    - BSE
+    - STAR
+    - CHINEXT
+    - CROSS_BORDER_ETF
+    - BOND_ETF
+    - MONEY_MARKET_ETF
+    - GOLD_ETF
+    - COMMODITY_ETF
+    - LEVERAGED_ETF
+    - INVERSE_ETF
+    - CONVERTIBLE_BOND
+    - OPTION
+    - FUTURE
+
+eligibility:
+  exclude_st: true
+  exclude_suspended_for_new_orders: true
+  exclude_delisted: true
+  min_listing_trading_days_for_buy: 60

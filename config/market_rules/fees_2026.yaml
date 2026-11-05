@@ -1,0 +1,108 @@
+# JANUS Phase 0 - effective-dated fee schedules (spec s6.3).
+#
+# Every number here is CONFIGURATION DATA, not code. Status ESTIMATED means these
+# are conservative simulation defaults, not a personal brokerage quote: actual
+# broker commissions differ per account and the exchange/regulatory components
+# must be re-verified against the current official fee notices before Phase 1.
+#
+# The single ESTIMATED schedule below intentionally spans the whole Phase 0 replay
+# window (from 2023-01-01). It is NOT a historical reconstruction of past fee
+# levels; it exists so simulated fills have a componentised, auditable cost basis.
+#
+# Components (spec s6.3): broker commission, minimum commission, stamp duty,
+# transfer fee, exchange handling/regulatory fee. Slippage is deliberately NOT a
+# fee line - it belongs to the versioned fill model (spec s6.2).
+
+fee_schedules:
+  - fee_schedule_id: CN-EQUITY-DEFAULT
+    version: phase0-estimated-1
+    status: ESTIMATED
+    effective_from: 2023-01-01T00:00:00+08:00
+    effective_to: null
+    source_refs:
+      - "https://www.sse.com.cn/lawandrules/sselawsrules2025/trade/universal/c/c_20260424_10816492.shtml"
+      - "JANUS Phase 0 spec s6.3 (componentised fee representation; numbers are simulation defaults)"
+    notes: >-
+      Phase 0 conservative default for A-share trading. Commission rate and
+      CNY 5.00 minimum are documented simulation defaults. Stamp duty is
+      sell-side only. Transfer fee and exchange handling fee are ESTIMATED and
+      must be replaced with the current official notices before any Phase 1
+      fee-sensitive evaluation.
+    lines:
+      - component: BROKER_COMMISSION
+        basis: NOTIONAL
+        rate: "0.00025"
+        applicable_sides: [BUY, SELL]
+        min_amount: "5.00"
+        max_amount: null
+        source: "JANUS Phase 0 conservative simulation default"
+        note: >-
+          Estimated full-service broker commission of 0.025% of notional per
+          side, floored at CNY 5.00 per order. Not a brokerage quote; the
+          calculator records the floor top-up as a separate MIN_COMMISSION line.
+      - component: STAMP_DUTY
+        basis: NOTIONAL
+        rate: "0.0005"
+        applicable_sides: [SELL]
+        min_amount: null
+        max_amount: null
+        source: "JANUS Phase 0 conservative simulation default"
+        note: >-
+          Sell-side only. ESTIMATED policy baseline; verify the current rate and
+          any temporary exemptions against the official tax notice.
+      - component: TRANSFER_FEE
+        basis: NOTIONAL
+        rate: "0.00001"
+        applicable_sides: [BUY, SELL]
+        min_amount: null
+        max_amount: null
+        source: "JANUS Phase 0 conservative simulation default"
+        note: >-
+          ESTIMATED share transfer fee charged on both sides.
+      - component: EXCHANGE_HANDLING_FEE
+        basis: NOTIONAL
+        rate: "0.0000341"
+        applicable_sides: [BUY, SELL]
+        min_amount: null
+        max_amount: null
+        source: "JANUS Phase 0 conservative simulation default"
+        note: >-
+          ESTIMATED exchange handling/regulatory component charged on both
+          sides. Verify against the current SSE/SZSE fee notice.
+
+  - fee_schedule_id: CN-ETF-DEFAULT
+    version: phase0-estimated-1
+    status: ESTIMATED
+    effective_from: 2023-01-01T00:00:00+08:00
+    effective_to: null
+    source_refs:
+      - "https://www.sse.com.cn/assortment/fund/etf/question/c/c_20240118_5734755.shtml"
+      - "JANUS Phase 0 spec s6.3 (componentised fee representation; numbers are simulation defaults)"
+    notes: >-
+      Phase 0 conservative default for domestic exchange-listed equity ETFs.
+      Stamp duty is not modelled for ETF units and no unit-transfer fee line is
+      modelled; both are ESTIMATED simplifications to be replaced with verified
+      schedules before Phase 1. No T+0 assumption is embedded here: settlement
+      treatment comes from the rule profile, never from the fee schedule.
+    lines:
+      - component: BROKER_COMMISSION
+        basis: NOTIONAL
+        rate: "0.00025"
+        applicable_sides: [BUY, SELL]
+        min_amount: "5.00"
+        max_amount: null
+        source: "JANUS Phase 0 conservative simulation default"
+        note: >-
+          Estimated broker commission of 0.025% of notional per side, floored at
+          CNY 5.00 per order. Some brokers waive the ETF minimum; that is NOT
+          assumed here.
+      - component: EXCHANGE_HANDLING_FEE
+        basis: NOTIONAL
+        rate: "0.0000341"
+        applicable_sides: [BUY, SELL]
+        min_amount: null
+        max_amount: null
+        source: "JANUS Phase 0 conservative simulation default"
+        note: >-
+          ESTIMATED exchange handling/regulatory component charged on both
+          sides for ETF units.

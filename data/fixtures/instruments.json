@@ -1,0 +1,165 @@
+[
+  {
+    "symbol": "600519.SH",
+    "name": "Kweichow Moutai",
+    "exchange": "SSE",
+    "board": "SSE_MAIN",
+    "instrument_type": "A_SHARE",
+    "status": "ACTIVE",
+    "listing_date": "2001-08-27"
+  },
+  {
+    "symbol": "601318.SH",
+    "name": "Ping An Insurance",
+    "exchange": "SSE",
+    "board": "SSE_MAIN",
+    "instrument_type": "A_SHARE",
+    "status": "ACTIVE",
+    "listing_date": "2007-03-01"
+  },
+  {
+    "symbol": "600036.SH",
+    "name": "China Merchants Bank",
+    "exchange": "SSE",
+    "board": "SSE_MAIN",
+    "instrument_type": "A_SHARE",
+    "status": "ACTIVE",
+    "listing_date": "2002-04-09"
+  },
+  {
+    "symbol": "000001.SZ",
+    "name": "Ping An Bank",
+    "exchange": "SZSE",
+    "board": "SZSE_MAIN",
+    "instrument_type": "A_SHARE",
+    "status": "ACTIVE",
+    "listing_date": "1991-04-03"
+  },
+  {
+    "symbol": "000651.SZ",
+    "name": "Gree Electric Appliances",
+    "exchange": "SZSE",
+    "board": "SZSE_MAIN",
+    "instrument_type": "A_SHARE",
+    "status": "ACTIVE",
+    "listing_date": "1996-11-18"
+  },
+  {
+    "symbol": "510300.SH",
+    "name": "Huatai-PB CSI 300 ETF",
+    "exchange": "SSE",
+    "board": "SSE_MAIN",
+    "instrument_type": "DOMESTIC_EQUITY_ETF",
+    "status": "ACTIVE",
+    "listing_date": "2012-05-28"
+  },
+  {
+    "symbol": "510500.SH",
+    "name": "ChinaAMC CSI 500 ETF",
+    "exchange": "SSE",
+    "board": "SSE_MAIN",
+    "instrument_type": "DOMESTIC_EQUITY_ETF",
+    "status": "ACTIVE",
+    "listing_date": "2013-03-15"
+  },
+  {
+    "symbol": "159915.SZ",
+    "name": "E Fund ChiNext ETF",
+    "exchange": "SZSE",
+    "board": "SZSE_MAIN",
+    "instrument_type": "DOMESTIC_EQUITY_ETF",
+    "status": "ACTIVE",
+    "listing_date": "2011-12-09"
+  },
+  {
+    "symbol": "510999.SH",
+    "name": "JANUS T+0 ETF RULE FIXTURE (not a real product)",
+    "exchange": "SSE",
+    "board": "SSE_MAIN",
+    "instrument_type": "DOMESTIC_EQUITY_ETF",
+    "status": "ACTIVE",
+    "listing_date": "2015-01-05"
+  },
+  {
+    "symbol": "300750.SZ",
+    "name": "CATL (ChiNext - excluded board)",
+    "exchange": "SZSE",
+    "board": "SZSE_CHINEXT",
+    "instrument_type": "A_SHARE",
+    "status": "ACTIVE",
+    "listing_date": "2018-06-11"
+  },
+  {
+    "symbol": "688981.SH",
+    "name": "SMIC (STAR - excluded board)",
+    "exchange": "SSE",
+    "board": "SSE_STAR",
+    "instrument_type": "A_SHARE",
+    "status": "ACTIVE",
+    "listing_date": "2020-07-16"
+  },
+  {
+    "symbol": "600000.SH",
+    "name": "SPD Bank (ST risk-warning fixture)",
+    "exchange": "SSE",
+    "board": "SSE_MAIN",
+    "instrument_type": "A_SHARE",
+    "status": "ST",
+    "listing_date": "1999-11-10"
+  },
+  {
+    "symbol": "600123.SH",
+    "name": "Suspended Security Fixture",
+    "exchange": "SSE",
+    "board": "SSE_MAIN",
+    "instrument_type": "A_SHARE",
+    "status": "SUSPENDED",
+    "listing_date": "2000-06-01"
+  },
+  {
+    "symbol": "600999.SH",
+    "name": "Delisted Security Fixture",
+    "exchange": "SSE",
+    "board": "SSE_MAIN",
+    "instrument_type": "A_SHARE",
+    "status": "DELISTED",
+    "listing_date": "1998-01-01",
+    "delisting_date": "2024-06-01"
+  },
+  {
+    "symbol": "601999.SH",
+    "name": "Recent IPO Fixture (seasoning window)",
+    "exchange": "SSE",
+    "board": "SSE_MAIN",
+    "instrument_type": "A_SHARE",
+    "status": "ACTIVE",
+    "listing_date": "2026-10-20"
+  },
+  {
+    "symbol": "513100.SH",
+    "name": "Cross-border ETF (excluded)",
+    "exchange": "SSE",
+    "board": "SSE_MAIN",
+    "instrument_type": "CROSS_BORDER_ETF",
+    "status": "ACTIVE",
+    "listing_date": "2013-05-15"
+  },
+  {
+    "symbol": "518880.SH",
+    "name": "Gold ETF (excluded)",
+    "exchange": "SSE",
+    "board": "SSE_MAIN",
+    "instrument_type": "GOLD_ETF",
+    "status": "ACTIVE",
+    "listing_date": "2013-07-18"
+  },
+  {
+    "symbol": "511010.SH",
+    "name": "Treasury Bond ETF (excluded)",
+    "exchange": "SSE",
+    "board": "SSE_MAIN",
+    "instrument_type": "BOND_ETF",
+    "status": "ACTIVE",
+    "listing_date": "2013-03-25"
+  }
+]

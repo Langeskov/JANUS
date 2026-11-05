@@ -1,0 +1,128 @@
+[project]
+name = "janus"
+version = "0.1.0"
+description = "JANUS - autonomous portfolio management system, Phase 0 (paper trading only)"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "Proprietary" }
+authors = [{ name = "JANUS Project" }]
+dependencies = [
+    "pydantic>=2.9,<3",
+    "pydantic-settings>=2.5,<3",
+    "PyYAML>=6.0,<7",
+    "SQLAlchemy>=2.0,<3",
+    "alembic>=1.13,<2",
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+    # Windows CPython ships no IANA tz database, and the market timezone
+    # (Asia/Shanghai) is resolved at import time. tzdata makes ZoneInfo work in a
+    # clean virtual environment on every platform.
+    "tzdata>=2024.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<10",
+    "pytest-cov>=5,<8",
+    "ruff>=0.6,<1",
+    "mypy>=1.11,<2",
+    "httpx>=0.27,<1",
+    "types-PyYAML>=6.0",
+]
+
+[project.scripts]
+janus = "janus_cli.main:main"
+
+[project.urls]
+Repository = "https://example.invalid/janus"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["janus", "apps/api/janus_api", "apps/cli/janus_cli"]
+
+[tool.uv]
+package = true
+
+# ---------------------------------------------------------------------------
+# Ruff - lint + format
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["janus", "apps", "tests"]
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "C4",   # comprehensions
+    "PT",   # flake8-pytest-style
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "B008",  # pydantic Field(...) in defaults is idiomatic
+    "RUF001", "RUF002", "RUF003",  # ambiguous unicode (CNY/a-share text)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["SIM117", "PT011"]
+
+# ---------------------------------------------------------------------------
+# mypy - static typing. Domain layer is fully typed and strictly checked.
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "."
+files = ["janus", "apps"]
+show_error_codes = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+no_implicit_optional = true
+strict_equality = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+no_implicit_reexport = true
+plugins = []
+
+[[tool.mypy.overrides]]
+# Fixture/test code does not need full annotation discipline.
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[[tool.mypy.overrides]]
+module = ["yaml", "alembic.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = [".", "apps/api", "apps/cli"]
+addopts = "-ra --strict-markers --strict-config"
+markers = [
+    "phase0: Phase 0 acceptance criteria tests",
+    "security: adversarial / prompt-injection boundary tests",
+    "simulation: paper-trading simulation behaviour",
+]
+filterwarnings = ["error::DeprecationWarning:janus.*"]
+
+[tool.coverage.run]
+source = ["janus"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]

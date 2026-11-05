@@ -1,0 +1,19 @@
+{
+  "as_of": "2026-11-05T15:30:00+08:00",
+  "strategy_id": "broad_etf_core",
+  "strategy_version": "0.1.0",
+  "regime": "RISK_OFF",
+  "target_weights": [
+    {"symbol": "510300.SH", "weight": 0.20},
+    {"symbol": "CASH.CNY", "weight": 0.80}
+  ],
+  "horizon_days": 20,
+  "thesis": "Extra-key fixture: an agent must not be able to smuggle tool or policy fields.",
+  "invalidation_conditions": ["Never valid"],
+  "evidence_refs": ["snapshot:dsnap-fixture-0001"],
+  "uncertainties": ["Deliberately malformed"],
+  "data_snapshot_id": "dsnap-fixture-0001",
+  "tool_calls": [],
+  "risk_policy": {"min_cash_weight": 0.0},
+  "api_key": "not-a-real-key"
+}
