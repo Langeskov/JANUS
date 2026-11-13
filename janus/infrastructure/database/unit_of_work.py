@@ -20,14 +20,21 @@ from janus.infrastructure.database.engine import Database
 from janus.infrastructure.database.repositories import (
     SqlAlchemyAccountRepository,
     SqlAlchemyCashLedgerRepository,
+    SqlAlchemyDataProvenanceRepository,
+    SqlAlchemyDataRevisionRepository,
     SqlAlchemyDataSnapshotRepository,
+    SqlAlchemyDataSourceRepository,
     SqlAlchemyDecisionRepository,
     SqlAlchemyFillRepository,
+    SqlAlchemyIngestionRunRepository,
     SqlAlchemyInstrumentRepository,
     SqlAlchemyMarketBarRepository,
     SqlAlchemyOrderRepository,
     SqlAlchemyPortfolioSnapshotRepository,
     SqlAlchemyPositionLedgerRepository,
+    SqlAlchemyProviderCapabilityRepository,
+    SqlAlchemyRawPayloadRepository,
+    SqlAlchemyRevisionInvalidationRepository,
     SqlAlchemyRiskDecisionRepository,
 )
 from sqlalchemy.orm import Session, sessionmaker
@@ -36,7 +43,7 @@ __all__ = ["SqlAlchemyUnitOfWork", "SqlAlchemyUnitOfWorkFactory"]
 
 
 class SqlAlchemyUnitOfWork:
-    """A single database transaction with all eleven repository ports bound."""
+    """A single database transaction with every repository port bound."""
 
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session = session_factory()
@@ -52,6 +59,14 @@ class SqlAlchemyUnitOfWork:
         self.data_snapshots = SqlAlchemyDataSnapshotRepository(self._session)
         self.portfolio_snapshots = SqlAlchemyPortfolioSnapshotRepository(self._session)
         self.market_bars = SqlAlchemyMarketBarRepository(self._session)
+        # -- data foundation (PR-001) -----------------------------------
+        self.data_sources = SqlAlchemyDataSourceRepository(self._session)
+        self.raw_payloads = SqlAlchemyRawPayloadRepository(self._session)
+        self.data_provenance = SqlAlchemyDataProvenanceRepository(self._session)
+        self.data_revisions = SqlAlchemyDataRevisionRepository(self._session)
+        self.revision_invalidations = SqlAlchemyRevisionInvalidationRepository(self._session)
+        self.ingestion_runs = SqlAlchemyIngestionRunRepository(self._session)
+        self.provider_capabilities = SqlAlchemyProviderCapabilityRepository(self._session)
 
     def __enter__(self) -> SqlAlchemyUnitOfWork:
         if self._closed:

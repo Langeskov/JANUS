@@ -20,6 +20,24 @@ Design notes
   for *programmer errors* (naive datetimes, negative counters), never for a
   business rejection.
 
+Verdict policy
+--------------
+Every check carries an explicit :class:`~janus.domain.risk.models.RiskVerdict`;
+``passed`` alone cannot express "the check could not be performed":
+
+* ``PASS`` -- the constraint was evaluated and holds.
+* ``FAIL`` -- the constraint was evaluated and is violated (always blocks).
+* ``NOT_APPLICABLE`` -- the rule provably does not apply to this order, by a
+  *documented* policy decision (e.g. a sell consumes no cash, a disabled control,
+  a rule set that declares no price limit, a sell of an existing position is
+  exempt from the new-buy eligibility rule). Non-blocking.
+* ``INDETERMINATE`` -- the constraint is mandatory but a required fact is
+  missing, so compliance cannot be established. Always blocks: a skipped check
+  is never reported as a pass.
+
+Only a ``PASS`` or ``NOT_APPLICABLE`` verdict contributes to an approved
+``RiskDecision``; ``FAIL`` and ``INDETERMINATE`` both reject.
+
 Two optional keyword arguments extend the mandated signature in a
 backwards-compatible way:
 
@@ -27,8 +45,9 @@ backwards-compatible way:
     The instrument's sector/industry key, used by ``SECTOR_EXPOSURE``. Phase 0's
     instrument master carries no sector field, so callers that do have sector
     attribution pass it here; when omitted the check uses ``intent.symbol`` as
-    the key of ``sector_weights`` and, if that is absent too, emits a passing
-    check documenting that sector attribution was unavailable.
+    the key of ``sector_weights`` and, if that is absent too, emits
+    ``NOT_APPLICABLE`` -- or ``INDETERMINATE`` when
+    ``controls.require_sector_attribution`` makes attribution mandatory.
 
 ``estimated_fees``
     The caller's computed buy-side fee estimate in CNY. When omitted the
@@ -67,7 +86,13 @@ from janus.domain.market_rules.calendar import TradingCalendar
 from janus.domain.market_rules.models import ResolvedTradingRules
 from janus.domain.orders.models import OrderIntent
 from janus.domain.portfolio.models import AccountMode, PortfolioAccount, PortfolioSnapshot, Position
-from janus.domain.risk.models import RiskCheck, RiskDecision, RiskPolicy, RiskRuleId
+from janus.domain.risk.models import (
+    RiskCheck,
+    RiskDecision,
+    RiskPolicy,
+    RiskRuleId,
+    RiskVerdict,
+)
 
 __all__ = [
     "DEFAULT_BUY_FEE_RATE",
@@ -268,9 +293,10 @@ class RiskController:
         """Evaluate one order intent and return an immutable risk decision.
 
         Returns a ``RiskDecision`` whose ``outcome`` is ``REJECT`` as soon as any
-        check fails; it never raises for a business rejection. A
-        :class:`ValidationError` means the *caller* passed something impossible
-        (naive datetime, negative counters), which is a programmer error.
+        check is blocking (``FAIL`` or ``INDETERMINATE``); it never raises for a
+        business rejection. A :class:`ValidationError` means the *caller* passed
+        something impossible (naive datetime, negative counters), which is a
+        programmer error.
 
         ``known_decision_ids`` / ``known_snapshot_ids`` are the **authoritative**
         sets of persisted ids for this evaluation: a decision/snapshot reference
@@ -303,12 +329,29 @@ class RiskController:
             estimated_fees=estimated_fees,
         )
         checks = self._run_checks(context)
-        failed = tuple(check for check in checks if not check.passed)
-        outcome = RiskOutcome.REJECT if failed else RiskOutcome.PASS
-        if failed:
-            summary = "risk rejected: " + ", ".join(check.rule_id.value for check in failed)
+        blocking = tuple(check for check in checks if check.verdict.blocks)
+        outcome = RiskOutcome.REJECT if blocking else RiskOutcome.PASS
+        if blocking:
+            fail_count = sum(1 for check in blocking if check.verdict is RiskVerdict.FAIL)
+            indeterminate_count = sum(
+                1 for check in blocking if check.verdict is RiskVerdict.INDETERMINATE
+            )
+            counts: list[str] = []
+            if fail_count:
+                counts.append(f"{fail_count} FAIL")
+            if indeterminate_count:
+                counts.append(f"{indeterminate_count} INDETERMINATE")
+            detail = ", ".join(
+                f"{check.rule_id.value}[{check.verdict.value}]" for check in blocking
+            )
+            summary = f"risk rejected: {' + '.join(counts)}: {detail}"
         else:
+            not_applicable_count = sum(
+                1 for check in checks if check.verdict is RiskVerdict.NOT_APPLICABLE
+            )
             summary = f"risk approved: {len(checks)} deterministic checks passed"
+            if not_applicable_count:
+                summary += f" ({not_applicable_count} not applicable)"
         return RiskDecision(
             risk_decision_id=new_id("riskdec"),
             order_intent_id=intent.intent_id,
@@ -404,7 +447,14 @@ class RiskController:
 
         decision_id = ctx.intent.decision_id
         if not self._policy.controls.require_decision_reference:
-            checks.append(RiskCheck.ok(RiskRuleId.DECISION_REFERENCE, measured="not_required"))
+            checks.append(
+                RiskCheck.not_applicable(
+                    RiskRuleId.DECISION_REFERENCE,
+                    "decision references are not required by policy "
+                    "(controls.require_decision_reference=false)",
+                    measured="not_required",
+                )
+            )
         elif not decision_id:
             checks.append(
                 RiskCheck.failed(
@@ -473,7 +523,12 @@ class RiskController:
 
     def _ruleset_check(self, ctx: _CheckContext) -> RiskCheck:
         if not self._policy.controls.require_known_ruleset:
-            return RiskCheck.ok(RiskRuleId.RULESET_KNOWN, measured="not_required")
+            return RiskCheck.not_applicable(
+                RiskRuleId.RULESET_KNOWN,
+                "ruleset references are not required by policy "
+                "(controls.require_known_ruleset=false)",
+                measured="not_required",
+            )
         rule_set_id = ctx.intent.rule_set_id
         rule_set_version = ctx.intent.rule_set_version
         if not rule_set_id or not rule_set_version:
@@ -536,8 +591,9 @@ class RiskController:
 
         eligibility = ctx.eligibility
         if not ctx.is_buy:
-            eligible = RiskCheck.ok(
+            eligible = RiskCheck.not_applicable(
                 RiskRuleId.INSTRUMENT_ELIGIBLE,
+                "the new-buy eligibility rule does not restrict selling an existing position",
                 measured="sell_of_existing_position",
             )
         elif eligibility is None:
@@ -571,7 +627,14 @@ class RiskController:
         today = market_date(ctx.now)
 
         if not self._policy.controls.require_fresh_market_data:
-            checks.append(RiskCheck.ok(RiskRuleId.MARKET_DATA_FRESH, measured="not_required"))
+            checks.append(
+                RiskCheck.not_applicable(
+                    RiskRuleId.MARKET_DATA_FRESH,
+                    "market-data freshness is not required by policy "
+                    "(controls.require_fresh_market_data=false)",
+                    measured="not_required",
+                )
+            )
         elif bar is None:
             checks.append(
                 RiskCheck.failed(
@@ -768,7 +831,11 @@ class RiskController:
     def _price_tick_check(self, ctx: _CheckContext) -> RiskCheck:
         price = ctx.intent.limit_price
         if ctx.intent.order_type is not OrderType.LIMIT:
-            return RiskCheck.ok(RiskRuleId.PRICE_TICK, measured="not_a_limit_order")
+            return RiskCheck.not_applicable(
+                RiskRuleId.PRICE_TICK,
+                "tick-size rounding applies to limit prices only",
+                measured=ctx.intent.order_type.value,
+            )
         if price is None:
             return RiskCheck.failed(RiskRuleId.PRICE_TICK, "limit order has no limit price")
         tick = ctx.rules.tick_size
@@ -812,8 +879,10 @@ class RiskController:
                 f"price limits could not be computed: {exc.message}",
             )
         if not limits.has_limits:
-            return RiskCheck.ok(
+            return RiskCheck.not_applicable(
                 RiskRuleId.PRICE_LIMIT_BAND,
+                "the resolved rule set declares no daily price limit for this "
+                "instrument, so there is no band to verify",
                 measured=limits.no_limit_reason or "no_limit",
             )
         limit_up = limits.limit_up
@@ -911,7 +980,11 @@ class RiskController:
 
     def _available_cash_check(self, ctx: _CheckContext) -> RiskCheck:
         if not ctx.is_buy:
-            return RiskCheck.ok(RiskRuleId.AVAILABLE_CASH, measured="sell_no_cash_required")
+            return RiskCheck.not_applicable(
+                RiskRuleId.AVAILABLE_CASH,
+                "a sell does not consume cash",
+                measured="sell_no_cash_required",
+            )
         required = ctx.required_cash
         if required is None:
             return RiskCheck.failed(
@@ -936,7 +1009,11 @@ class RiskController:
 
     def _available_quantity_check(self, ctx: _CheckContext) -> RiskCheck:
         if ctx.is_buy:
-            return RiskCheck.ok(RiskRuleId.AVAILABLE_QUANTITY, measured="buy_no_quantity_required")
+            return RiskCheck.not_applicable(
+                RiskRuleId.AVAILABLE_QUANTITY,
+                "a buy does not require available position quantity",
+                measured="buy_no_quantity_required",
+            )
         position = ctx.position
         if position is None:
             return RiskCheck.failed(
@@ -972,7 +1049,12 @@ class RiskController:
           liquidation, but it must not block reducing the position either.
         """
         if not ctx.is_buy:
-            return RiskCheck.ok(RiskRuleId.SINGLE_INSTRUMENT_WEIGHT, measured="risk_reducing_sell")
+            return RiskCheck.not_applicable(
+                RiskRuleId.SINGLE_INSTRUMENT_WEIGHT,
+                "a sell cannot increase single-instrument exposure, so the "
+                "limit does not restrict it",
+                measured="risk_reducing_sell",
+            )
         if ctx.nav <= 0:
             return RiskCheck.failed(
                 RiskRuleId.SINGLE_INSTRUMENT_WEIGHT,
@@ -1101,11 +1183,21 @@ class RiskController:
             )
         key = ctx.sector_key
         if key is None:
-            # Phase 0's instrument master has no sector field. The check stays
-            # explicit rather than silently claiming compliance: a passing check
-            # documents that no sector attribution was available to enforce.
-            return RiskCheck.ok(
+            # The Phase 0 instrument master has no sector field, so attribution is
+            # genuinely unavailable. The verdict must state that honestly: either
+            # the constraint is not applicable (default policy) or it cannot be
+            # verified and therefore blocks approval. It is never reported as a
+            # verified pass.
+            if self._policy.controls.require_sector_attribution:
+                return RiskCheck.indeterminate(
+                    RiskRuleId.SECTOR_EXPOSURE,
+                    "sector attribution is mandatory but unavailable for this instrument",
+                    measured="sector_attribution_unavailable",
+                    threshold=self._policy.limits.max_sector_weight,
+                )
+            return RiskCheck.not_applicable(
                 RiskRuleId.SECTOR_EXPOSURE,
+                "sector attribution is unavailable and not required by policy",
                 measured="sector_attribution_unavailable",
                 threshold=self._policy.limits.max_sector_weight,
             )
@@ -1153,9 +1245,18 @@ class RiskController:
 
     def _no_short_check(self, ctx: _CheckContext) -> RiskCheck:
         if self._policy.execution.allow_short:  # pragma: no cover - policy rejects
-            return RiskCheck.ok(RiskRuleId.NO_SHORT, measured="policy_allows_short")
+            return RiskCheck.not_applicable(
+                RiskRuleId.NO_SHORT,
+                "short selling is permitted by policy, so the no-short rule is "
+                "not applicable (unreachable in Phase 0 policy validation)",
+                measured="policy_allows_short",
+            )
         if ctx.is_buy:
-            return RiskCheck.ok(RiskRuleId.NO_SHORT, measured="buy_not_a_short")
+            return RiskCheck.not_applicable(
+                RiskRuleId.NO_SHORT,
+                "the no-short constraint applies to sells only",
+                measured="buy_not_a_short",
+            )
         position = ctx.position
         if position is None:
             return RiskCheck.failed(
@@ -1181,7 +1282,11 @@ class RiskController:
                 RiskRuleId.NO_LEVERAGE, "policy enables leverage; Phase 0 forbids it"
             )
         if not ctx.is_buy:
-            return RiskCheck.ok(RiskRuleId.NO_LEVERAGE, measured="sell_reduces_exposure")
+            return RiskCheck.not_applicable(
+                RiskRuleId.NO_LEVERAGE,
+                "the no-leverage constraint applies to buys only; a sell reduces exposure",
+                measured="sell_reduces_exposure",
+            )
         projected_cash = ctx.projected_cash
         if projected_cash is None:
             return RiskCheck.failed(RiskRuleId.NO_LEVERAGE, "post-trade cash cannot be determined")
@@ -1201,7 +1306,16 @@ class RiskController:
                 "policy enables derivatives; Phase 0 forbids them",
             )
         instrument = ctx.instrument
-        if instrument is not None and instrument.instrument_type in _DERIVATIVE_INSTRUMENT_TYPES:
+        if instrument is None:
+            # The restriction is mandatory, but without instrument master data
+            # the instrument type cannot be verified: report INDETERMINATE rather
+            # than a dishonest pass.
+            return RiskCheck.indeterminate(
+                RiskRuleId.NO_DERIVATIVES,
+                "instrument type is unavailable, so derivative exclusion cannot be verified",
+                measured="unknown",
+            )
+        if instrument.instrument_type in _DERIVATIVE_INSTRUMENT_TYPES:
             return RiskCheck.failed(
                 RiskRuleId.NO_DERIVATIVES,
                 "derivative and leveraged/inverse products are forbidden in Phase 0",
@@ -1209,5 +1323,5 @@ class RiskController:
             )
         return RiskCheck.ok(
             RiskRuleId.NO_DERIVATIVES,
-            measured=(instrument.instrument_type.value if instrument is not None else "unknown"),
+            measured=instrument.instrument_type.value,
         )

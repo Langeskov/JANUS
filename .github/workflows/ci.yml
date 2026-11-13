@@ -33,7 +33,7 @@ jobs:
       - name: Install Python 3.12 and lockfile dependencies
         run: |
           uv python install 3.12
-          uv sync --locked --extra dev
+          uv sync --locked
 
       - name: Lint (ruff)
         run: uv run ruff check .
@@ -82,6 +82,6 @@ jobs:
           enable-cache: true
       - run: |
           uv python install 3.12
-          uv sync --locked --extra dev
+          uv sync --locked
       - name: Domain must stay framework-free
         run: uv run pytest tests/unit/test_layering.py -q

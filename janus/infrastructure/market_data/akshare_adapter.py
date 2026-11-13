@@ -4,6 +4,11 @@ AKShare aggregates public sources. Its own documentation flags research/
 academic use and commercial-usage risk, so Phase 0 must never treat it as a
 guaranteed commercial feed (Phase 0 spec s7.1). The adapter is a configured but
 disabled shell and does not import the ``akshare`` package.
+
+Its capability declaration is intentionally empty: the shell supplies nothing, so
+claiming any dataset would be a lie. ``capabilities()`` is a classmethod because
+a disabled adapter cannot be constructed, while the (empty) declaration still has
+to be auditable and registerable (PR-001 §5).
 """
 
 from __future__ import annotations
@@ -13,9 +18,13 @@ from datetime import date
 from janus.application.ports.market_data import ProviderHealth
 from janus.domain.common.errors import UnsupportedEntityError
 from janus.domain.common.time import utc_now
+from janus.domain.data_foundation.capabilities import ProviderCapabilities
 from janus.domain.market_data.models import MarketBar
+from janus.infrastructure.market_data.capability_gate import PHASE0_DECLARATION_AT
 
 __all__ = ["AKShareProvider"]
+
+PROVIDER_ID = "akshare"
 
 
 class AKShareProvider:
@@ -34,7 +43,28 @@ class AKShareProvider:
 
     @property
     def provider_id(self) -> str:
-        return "akshare"
+        return PROVIDER_ID
+
+    @classmethod
+    def capabilities(cls) -> ProviderCapabilities:
+        """Declare an empty capability set: this shell supplies no data.
+
+        AKShare is an optional research-only cross-check source, never a
+        guaranteed commercial feed. Phase 0 declares no capabilities at all; a
+        future phase may add a capability only after the corresponding data
+        contract, permission and quality tests exist.
+        """
+        return ProviderCapabilities(
+            provider_id=PROVIDER_ID,
+            supported=frozenset(),
+            declared_at=PHASE0_DECLARATION_AT,
+            declaration_reason="disabled Phase 0 shell; no data is supplied",
+            notes=(
+                "Phase 1 research-only cross-check source. Public-source data "
+                "with commercial-use caveats; not a guaranteed commercial feed. "
+                "Disabled in Phase 0, so it declares no capabilities."
+            ),
+        )
 
     def get_daily_bar(self, symbol: str, trade_date: date) -> MarketBar | None:
         raise UnsupportedEntityError("AKShare integration is not implemented in Phase 0")

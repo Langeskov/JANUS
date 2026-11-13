@@ -33,6 +33,7 @@ __all__ = [
     "RiskLimits",
     "RiskPolicy",
     "RiskRuleId",
+    "RiskVerdict",
 ]
 
 
@@ -126,6 +127,15 @@ class RiskControls(BaseModel):
 
     max_quote_age_seconds: int = Field(default=300, ge=1)
 
+    require_sector_attribution: bool = False
+    """Whether ``SECTOR_EXPOSURE`` is a mandatory constraint.
+
+    Phase 0's instrument master carries no sector field, so by default the rule
+    is explicitly ``NOT_APPLICABLE`` (documented, non-blocking). Setting this to
+    ``True`` makes missing attribution ``INDETERMINATE``, which blocks approval:
+    an unverified exposure limit must never look like compliance.
+    """
+
 
 class RiskLimits(BaseModel):
     """Exposure/turnover limits. Conservative *development* defaults only."""
@@ -206,16 +216,69 @@ class RiskPolicy(BaseModel):
     drawdown: DrawdownPolicy = DrawdownPolicy()
 
 
+class RiskVerdict(StrEnum):
+    """Explicit outcome of one deterministic risk check.
+
+    ``passed`` alone cannot express "the check could not be performed", which is
+    exactly the situation that must never be reported as compliance.
+    """
+
+    PASS = "PASS"
+    """The check was performed and the constraint holds."""
+
+    FAIL = "FAIL"
+    """The check was performed and the constraint is violated."""
+
+    INDETERMINATE = "INDETERMINATE"
+    """Required data was unavailable/insufficient, so compliance is unknown.
+
+    An enabled mandatory constraint in this state blocks approval; it is never
+    silently treated as a pass.
+    """
+
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+    """The rule is explicitly not applicable to this order/configuration.
+
+    Unlike ``INDETERMINATE`` this is a deliberate, documented decision and does
+    not block approval.
+    """
+
+    @property
+    def is_pass(self) -> bool:
+        return self is RiskVerdict.PASS or self is RiskVerdict.NOT_APPLICABLE
+
+    @property
+    def blocks(self) -> bool:
+        return self in {RiskVerdict.FAIL, RiskVerdict.INDETERMINATE}
+
+
 class RiskCheck(BaseModel):
-    """One deterministic check outcome with its measured value."""
+    """One deterministic check outcome with its verdict and measured value."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     rule_id: RiskRuleId
+    verdict: RiskVerdict
     passed: bool
     message: str = ""
     measured: str | None = None
     threshold: str | None = None
+
+    @model_validator(mode="after")
+    def _verdict_matches_passed(self) -> RiskCheck:
+        expected = self.verdict.is_pass
+        if self.passed is not expected:
+            raise ValidationError(
+                "passed must be True exactly when the verdict is PASS or NOT_APPLICABLE",
+                rule_id=self.rule_id.value,
+                verdict=self.verdict.value,
+                passed=self.passed,
+            )
+        if self.verdict is RiskVerdict.FAIL and not self.message:
+            raise ValidationError(
+                "a FAIL verdict requires an explanatory message", rule_id=self.rule_id.value
+            )
+        return self
 
     @classmethod
     def ok(
@@ -223,6 +286,7 @@ class RiskCheck(BaseModel):
     ) -> RiskCheck:
         return cls(
             rule_id=rule_id,
+            verdict=RiskVerdict.PASS,
             passed=True,
             measured=None if measured is None else str(measured),
             threshold=None if threshold is None else str(threshold),
@@ -239,7 +303,46 @@ class RiskCheck(BaseModel):
     ) -> RiskCheck:
         return cls(
             rule_id=rule_id,
+            verdict=RiskVerdict.FAIL,
             passed=False,
+            message=message,
+            measured=None if measured is None else str(measured),
+            threshold=None if threshold is None else str(threshold),
+        )
+
+    @classmethod
+    def indeterminate(
+        cls,
+        rule_id: RiskRuleId,
+        message: str,
+        *,
+        measured: object = None,
+        threshold: object = None,
+    ) -> RiskCheck:
+        """Compliance could not be established; this blocks approval."""
+        return cls(
+            rule_id=rule_id,
+            verdict=RiskVerdict.INDETERMINATE,
+            passed=False,
+            message=message,
+            measured=None if measured is None else str(measured),
+            threshold=None if threshold is None else str(threshold),
+        )
+
+    @classmethod
+    def not_applicable(
+        cls,
+        rule_id: RiskRuleId,
+        message: str = "",
+        *,
+        measured: object = None,
+        threshold: object = None,
+    ) -> RiskCheck:
+        """The rule does not apply here, by documented policy (does not block)."""
+        return cls(
+            rule_id=rule_id,
+            verdict=RiskVerdict.NOT_APPLICABLE,
+            passed=True,
             message=message,
             measured=None if measured is None else str(measured),
             threshold=None if threshold is None else str(threshold),
@@ -249,7 +352,9 @@ class RiskCheck(BaseModel):
 class RiskDecision(BaseModel):
     """Immutable record of a risk evaluation.
 
-    ``outcome`` must agree with ``checks``: PASS only when every check passed.
+    ``outcome`` must agree with ``checks``: PASS only when every check verdict is
+    ``PASS`` or ``NOT_APPLICABLE``. A ``FAIL`` or ``INDETERMINATE`` check blocks
+    approval — an unverified mandatory constraint is never reported as success.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -273,11 +378,15 @@ class RiskDecision(BaseModel):
         ensure_aware(self.decided_at, "decided_at")
         if not self.checks:
             raise ValidationError("a risk decision must contain at least one check")
-        all_passed = all(check.passed for check in self.checks)
+        all_passed = all(check.verdict.is_pass for check in self.checks)
         if self.outcome is RiskOutcome.PASS and not all_passed:
             raise ValidationError(
-                "PASS outcome contradicts failed checks",
-                failed=[c.rule_id.value for c in self.checks if not c.passed],
+                "PASS outcome contradicts a blocking check verdict",
+                blocking=[
+                    f"{check.rule_id.value}:{check.verdict.value}"
+                    for check in self.checks
+                    if check.verdict.blocks
+                ],
             )
         if self.outcome is RiskOutcome.REJECT and all_passed:
             raise ValidationError("REJECT outcome contradicts a fully passing check set")
@@ -285,11 +394,27 @@ class RiskDecision(BaseModel):
 
     @property
     def failed_rule_ids(self) -> tuple[RiskRuleId, ...]:
-        return tuple(check.rule_id for check in self.checks if not check.passed)
+        """Rules that actively failed or could not be verified (all blocking)."""
+        return tuple(check.rule_id for check in self.checks if check.verdict.blocks)
+
+    @property
+    def indeterminate_rule_ids(self) -> tuple[RiskRuleId, ...]:
+        """Mandatory rules whose compliance could not be established."""
+        return tuple(
+            check.rule_id for check in self.checks if check.verdict is RiskVerdict.INDETERMINATE
+        )
+
+    @property
+    def not_applicable_rule_ids(self) -> tuple[RiskRuleId, ...]:
+        return tuple(
+            check.rule_id for check in self.checks if check.verdict is RiskVerdict.NOT_APPLICABLE
+        )
 
     def failed_reasons(self) -> list[str]:
         return [
-            f"{check.rule_id.value}: {check.message}" for check in self.checks if not check.passed
+            f"{check.rule_id.value} [{check.verdict.value}]: {check.message}"
+            for check in self.checks
+            if check.verdict.blocks
         ]
 
     @property

@@ -14,6 +14,10 @@ The generated series is a slow sine wave plus small deterministic noise, which
 keeps day-over-day moves well inside a +/-10% price-limit band so that risk and
 fill logic can be exercised realistically. This is *simulation data*, not real
 market history, and must never be described as such.
+
+The provider declares exactly one capability, ``DAILY_BARS`` (see
+:meth:`FixtureProvider.capabilities`). It must never claim a dataset it cannot
+supply: an unsupported request has to fail closed, not return an empty success.
 """
 
 from __future__ import annotations
@@ -28,10 +32,12 @@ from pathlib import Path
 from janus.application.ports.market_data import ProviderHealth
 from janus.domain.common.enums import AdjustmentMode, DataQualityStatus, InstrumentType, QuoteSource
 from janus.domain.common.errors import ConfigurationError, NotFoundError
-from janus.domain.common.time import MARKET_TZ, PointInTime
+from janus.domain.common.time import MARKET_TZ, PointInTime, ensure_aware
+from janus.domain.data_foundation.capabilities import DataCapability, ProviderCapabilities
 from janus.domain.instruments.models import Instrument
 from janus.domain.instruments.symbol import validate_symbol
 from janus.domain.market_data.models import MarketBar
+from janus.infrastructure.market_data.capability_gate import PHASE0_DECLARATION_AT
 
 __all__ = ["FixtureProvider", "load_instruments", "load_strategies"]
 
@@ -74,18 +80,49 @@ def _base_price(instrument: Instrument) -> Decimal:
 class FixtureProvider:
     """Deterministic, offline :class:`MarketDataProvider` implementation."""
 
-    __slots__ = ("_fail_lookups", "_instruments")
+    __slots__ = ("_declared_at", "_fail_lookups", "_instruments")
 
-    def __init__(self, instruments: Sequence[Instrument], *, fail_lookups: bool = False) -> None:
+    def __init__(
+        self,
+        instruments: Sequence[Instrument],
+        *,
+        fail_lookups: bool = False,
+        declared_at: datetime | None = None,
+    ) -> None:
         self._instruments: dict[str, Instrument] = {i.symbol: i for i in instruments}
         if len(self._instruments) != len(instruments):
             raise ConfigurationError("duplicate symbol in fixture instrument master")
         self._fail_lookups = fail_lookups
+        self._declared_at: datetime = (
+            PHASE0_DECLARATION_AT
+            if declared_at is None
+            else ensure_aware(declared_at, "declared_at")
+        )
 
     # -- MarketDataProvider ---------------------------------------------
     @property
     def provider_id(self) -> str:
         return PROVIDER_ID
+
+    def capabilities(self) -> ProviderCapabilities:
+        """Declare exactly what this provider can supply (fail-closed).
+
+        The fixture provider supplies synthetic daily bars only; it never claims
+        minute data, real-time quotes, financial reports, corporate actions or
+        announcements. ``declared_at`` is fixed (or explicitly injected) rather
+        than read from the wall clock, so the declaration id is reproducible.
+        """
+        return ProviderCapabilities(
+            provider_id=PROVIDER_ID,
+            supported=frozenset({DataCapability.DAILY_BARS}),
+            declared_at=self._declared_at,
+            declaration_reason="deterministic offline fixtures",
+            notes=(
+                "Synthetic daily bars generated from (symbol, trade_date) with no "
+                "network and no wall clock; simulation data, not real market "
+                "history. Supplies daily bars only."
+            ),
+        )
 
     def get_daily_bar(self, symbol: str, trade_date: date) -> MarketBar | None:
         canonical = validate_symbol(symbol)

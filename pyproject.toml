@@ -20,7 +20,10 @@ dependencies = [
     "tzdata>=2024.1",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
+# Development tooling lives in the default uv ``dev`` dependency group, so
+# ``uv sync --locked`` produces a fully usable test/lint/type environment --
+# which is exactly what the PR validation and CI commands rely on.
 dev = [
     "pytest>=8.3,<10",
     "pytest-cov>=5,<8",

@@ -15,6 +15,15 @@ from __future__ import annotations
 from datetime import date
 from typing import Protocol, runtime_checkable
 
+from janus.application.ports.data_foundation import (
+    DataProvenanceRepository,
+    DataRevisionRepository,
+    DataSourceRepository,
+    IngestionRunRepository,
+    ProviderCapabilityRepository,
+    RawPayloadRepository,
+    RevisionInvalidationRepository,
+)
 from janus.domain.instruments.models import Instrument
 from janus.domain.ledger.models import CashLedgerEntry, PositionEvent
 from janus.domain.market_data.models import DataSnapshot, MarketBar
@@ -26,14 +35,21 @@ from janus.domain.strategy.decision import DecisionRecord
 __all__ = [
     "AccountRepository",
     "CashLedgerRepository",
+    "DataProvenanceRepository",
+    "DataRevisionRepository",
     "DataSnapshotRepository",
+    "DataSourceRepository",
     "DecisionRepository",
     "FillRepository",
+    "IngestionRunRepository",
     "InstrumentRepository",
     "MarketBarRepository",
     "OrderRepository",
     "PortfolioSnapshotRepository",
     "PositionLedgerRepository",
+    "ProviderCapabilityRepository",
+    "RawPayloadRepository",
+    "RevisionInvalidationRepository",
     "RiskDecisionRepository",
     "UnitOfWork",
     "UnitOfWorkFactory",
@@ -201,6 +217,15 @@ class UnitOfWork(Protocol):
     data_snapshots: DataSnapshotRepository
     portfolio_snapshots: PortfolioSnapshotRepository
     market_bars: MarketBarRepository
+
+    # -- data foundation (PR-001) ---------------------------------------
+    data_sources: DataSourceRepository
+    raw_payloads: RawPayloadRepository
+    data_provenance: DataProvenanceRepository
+    data_revisions: DataRevisionRepository
+    revision_invalidations: RevisionInvalidationRepository
+    ingestion_runs: IngestionRunRepository
+    provider_capabilities: ProviderCapabilityRepository
 
     def __enter__(self) -> UnitOfWork: ...
 

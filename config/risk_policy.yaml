@@ -26,6 +26,13 @@ controls:
   # order. The simulator is daily-frequency, so a small window is intentional.
   max_bar_age_days: 5
   max_quote_age_seconds: 300
+  # Phase 0's instrument master has no sector/industry field, so sector
+  # attribution is normally unavailable. With this false, SECTOR_EXPOSURE is
+  # explicitly NOT_APPLICABLE (documented, non-blocking) when attribution is
+  # missing. Setting it true makes the missing attribution INDETERMINATE, which
+  # blocks new orders until attribution exists -- an unverified exposure limit
+  # must never be reported as compliance.
+  require_sector_attribution: false
 
 limits:
   max_single_instrument_weight: 0.10   # development default; tune only through reviewed config

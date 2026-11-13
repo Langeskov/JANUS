@@ -44,7 +44,7 @@ REQUIRED_TABLES = frozenset(
     }
 )
 
-INITIAL_REVISION = "0001_initial"
+HEAD_REVISION = "0002_data_foundation"
 
 
 def _url(tmp_path: Path, name: str = "migrated.db") -> str:
@@ -62,7 +62,7 @@ def test_upgrade_head_creates_full_schema(tmp_path: Path) -> None:
 
     status = check_schema(url)
     assert status.is_current
-    assert status.current_revision == INITIAL_REVISION
+    assert status.current_revision == HEAD_REVISION
     assert status.current_revision == head_revision(config)
 
     engine = create_engine_from_url(url)
@@ -162,7 +162,7 @@ def test_schema_check_reports_pending_until_migrated(tmp_path: Path) -> None:
 
     _migrate(url)
     assert check_schema(url).is_current
-    assert assert_schema_current(url).current_revision == INITIAL_REVISION
+    assert assert_schema_current(url).current_revision == HEAD_REVISION
 
 
 def test_janus_db_url_environment_variable_is_honoured(
@@ -224,4 +224,4 @@ def test_schema_check_cli_exit_codes(
     assert main(["--database-url", url]) == 0
     output = capsys.readouterr().out
     assert "up to date" in output
-    assert INITIAL_REVISION in output
+    assert HEAD_REVISION in output

@@ -12,7 +12,7 @@ Governing spec: `JANUS_Phase0_Spec.md` (Phase 0 = fixed-capital **paper trading 
 ## 1. Toolchain and commands
 
 ```powershell
-uv sync --extra dev          # create/refresh .venv (Lead does this)
+uv sync --locked             # create/refresh .venv incl. dev tooling (Lead does this)
 uv run pytest -q             # ALL tests
 uv run pytest tests/unit -q  # one directory
 uv run ruff check .          # lint

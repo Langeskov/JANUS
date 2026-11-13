@@ -66,7 +66,7 @@ apps/api/janus_api          FastAPI transport (localhost only)
 apps/cli/janus_cli          argparse CLI (`janus ...`)
 janus/application/          JanusContainer facade + DTOs, ports, services, workflows
 janus/domain/               pure domain: instruments, market_rules, portfolio,
-                            ledger, orders, risk, strategy, common
+                            ledger, orders, risk, strategy, data_foundation, common
 janus/infrastructure/       adapters: config loader, database (SQLAlchemy),
                             market_data, rulesets, paper_execution,
                             observability, llm
@@ -95,6 +95,20 @@ infrastructure  ->  domain ports / application ports
 - Fail closed: an unknown symbol, rule set, strategy version, stale snapshot, or
   unsupported board is a rejection, never a guess.
 
+**Data foundation (PR-001).** Phase 1 adds an immutable data foundation inside
+`janus/domain/data_foundation/` plus the application ports/services around it:
+raw provider payloads are archived content-addressed and credential-screened,
+provenance records keep the distinct temporal semantics (`published_at`,
+`public_available_at`, `retrieved_at`, `ingested_at`, `system_first_observed_at`,
+`strategy_usable_at`), normalized facts are stored as append-only revisions, and
+point-in-time queries select only what a strategy could legally have seen at a
+historical cutoff (`AVAILABILITY_ONLY` / `SYSTEM_OBSERVED_ONLY`). Providers declare
+their capabilities and fail closed on an undeclared dataset instead of returning
+an empty "success". Design rationale:
+[ADR-0009](docs/adr/0009-temporal-data-model-and-point-in-time-semantics.md);
+usage and contracts: [`docs/data_foundation.md`](docs/data_foundation.md); storage:
+[`docs/database_schema.md`](docs/database_schema.md).
+
 ---
 
 ## Quick start
@@ -104,7 +118,7 @@ below is offline and deterministic; no credentials or network are required.
 
 ```powershell
 # 1. Create/refresh .venv from the lockfile (includes dev tooling)
-uv sync --extra dev
+uv sync --locked
 
 # 2. Apply the SQLite schema
 uv run alembic upgrade head
@@ -150,6 +164,8 @@ development defaults: review them before relying on any behaviour.
 |---|---|
 | [`docs/charter.md`](docs/charter.md) | Project charter, scope, boundaries, exit condition |
 | [`docs/adr/`](docs/adr) | Architecture decision records (start with the index) |
+| [`docs/data_foundation.md`](docs/data_foundation.md) | Data foundation (PR-001): raw archive, provenance, revisions, point-in-time queries, capability contract |
+| [`docs/database_schema.md`](docs/database_schema.md) | SQLite schema: Phase 0 tables and the PR-001 data-foundation tables, keys/indexes, migration chain |
 | [`docs/market_rules/`](docs/market_rules) | Market-rule baseline, sources and assumptions |
 | [`docs/CONTRACT.md`](docs/CONTRACT.md) | Engineering contract, layering rules, ownership map |
 

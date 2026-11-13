@@ -13,11 +13,33 @@ keeps ``plugins = []``), and every column is covered by the round-trip tests.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any
 
 from janus.domain.common.time import PointInTime
+from janus.domain.data_foundation.capabilities import (
+    DataCapability,
+    DataSource,
+    ProviderCapabilities,
+)
+from janus.domain.data_foundation.provenance import (
+    DataProvenance,
+    ProvenanceTimestamps,
+)
+from janus.domain.data_foundation.quality import (
+    IngestionReport,
+    QualityIssue,
+    QualityIssueCode,
+)
+from janus.domain.data_foundation.query import LoadedRevision
+from janus.domain.data_foundation.raw import RawPayload
+from janus.domain.data_foundation.revisions import (
+    DataRevision,
+    DataValue,
+    RevisionInvalidation,
+)
 from janus.domain.instruments.models import Instrument
 from janus.domain.ledger.models import CashLedgerEntry, PositionEvent
 from janus.domain.market_data.models import DataSnapshot, MarketBar
@@ -30,16 +52,24 @@ from janus.infrastructure.database.tables import (
     AccountRow,
     Base,
     CashLedgerEntryRow,
+    DataProvenanceRow,
+    DataRevisionInvalidationRow,
+    DataRevisionRow,
     DataSnapshotRow,
+    DataSourceRow,
     DecisionRecordRow,
     FeeLineRow,
     FillRow,
+    IngestionIssueRow,
+    IngestionRunRow,
     InstrumentRow,
     MarketBarRow,
     OrderRow,
     PortfolioPositionRow,
     PortfolioSnapshotRow,
     PositionEventRow,
+    ProviderCapabilityRow,
+    RawPayloadRow,
     RiskCheckRow,
     RiskDecisionRow,
 )
@@ -49,16 +79,30 @@ __all__ = [
     "account_to_values",
     "cash_entry_from_row",
     "cash_entry_to_values",
+    "data_provenance_from_row",
+    "data_provenance_to_values",
+    "data_revision_from_row",
+    "data_revision_to_values",
     "data_snapshot_from_row",
     "data_snapshot_to_values",
+    "data_source_from_row",
+    "data_source_to_values",
+    "data_value_from_row",
+    "data_value_to_values",
     "decision_record_from_row",
     "decision_record_to_values",
     "fee_line_from_row",
     "fee_line_to_values",
     "fill_from_row",
     "fill_to_values",
+    "ingestion_issue_from_row",
+    "ingestion_issue_id",
+    "ingestion_issue_to_values",
+    "ingestion_report_from_row",
+    "ingestion_run_to_values",
     "instrument_from_row",
     "instrument_to_values",
+    "loaded_revision_from_rows",
     "make_row",
     "market_bar_from_row",
     "market_bar_to_values",
@@ -70,6 +114,12 @@ __all__ = [
     "portfolio_snapshot_to_values",
     "position_event_from_row",
     "position_event_to_values",
+    "provider_capabilities_from_row",
+    "provider_capabilities_to_values",
+    "raw_payload_from_row",
+    "raw_payload_to_values",
+    "revision_invalidation_from_row",
+    "revision_invalidation_to_values",
     "risk_check_from_row",
     "risk_check_to_values",
     "risk_decision_from_row",
@@ -429,6 +479,7 @@ def risk_check_to_values(
         "risk_decision_id": risk_decision_id,
         "check_index": check_index,
         "rule_id": check.rule_id,
+        "verdict": check.verdict,
         "passed": check.passed,
         "message": check.message,
         "measured": check.measured,
@@ -439,6 +490,7 @@ def risk_check_to_values(
 def risk_check_from_row(row: RiskCheckRow) -> RiskCheck:
     return RiskCheck(
         rule_id=row.rule_id,
+        verdict=row.verdict,
         passed=row.passed,
         message=row.message,
         measured=row.measured,
@@ -679,4 +731,305 @@ def market_bar_from_row(row: MarketBarRow) -> MarketBar:
             effective_from=row.effective_from,
             effective_to=row.effective_to,
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Data foundation (PR-001): sources, raw payloads, provenance, revisions,
+# invalidations, ingestion audit, capability declarations
+# ---------------------------------------------------------------------------
+
+
+def data_source_to_values(source: DataSource) -> dict[str, Any]:
+    return {
+        "source_id": source.source_id,
+        "kind": source.kind,
+        "display_name": source.display_name,
+        "registered_at": source.registered_at,
+        "notes": source.notes,
+    }
+
+
+def data_source_from_row(row: DataSourceRow) -> DataSource:
+    return DataSource(
+        source_id=row.source_id,
+        kind=row.kind,
+        display_name=row.display_name,
+        registered_at=row.registered_at,
+        notes=row.notes,
+    )
+
+
+def raw_payload_to_values(payload: RawPayload) -> dict[str, Any]:
+    return {
+        "payload_id": payload.payload_id,
+        "content_hash": payload.content_hash,
+        "byte_size": payload.byte_size,
+        "media_type": payload.media_type,
+        "source_id": payload.source_id,
+        "dataset": payload.dataset,
+        "request_scope": dict(payload.request_scope),
+        "retrieved_at": payload.retrieved_at,
+        "ingested_at": payload.ingested_at,
+        "payload_text": payload.payload_text,
+    }
+
+
+def raw_payload_from_row(row: RawPayloadRow) -> RawPayload:
+    return RawPayload(
+        payload_id=row.payload_id,
+        content_hash=row.content_hash,
+        byte_size=row.byte_size,
+        media_type=row.media_type,
+        source_id=row.source_id,
+        dataset=row.dataset,
+        request_scope=dict(row.request_scope),
+        retrieved_at=row.retrieved_at,
+        ingested_at=row.ingested_at,
+        payload_text=row.payload_text,
+    )
+
+
+def data_provenance_to_values(provenance: DataProvenance) -> dict[str, Any]:
+    timestamps = provenance.timestamps
+    return {
+        "provenance_id": provenance.provenance_id,
+        "source_id": provenance.source_id,
+        "dataset": provenance.dataset,
+        "source_record_id": provenance.source_record_id,
+        "event_at": timestamps.event_at,
+        "published_at": timestamps.published_at,
+        "retrieved_at": timestamps.retrieved_at,
+        "ingested_at": timestamps.ingested_at,
+        "system_first_observed_at": timestamps.system_first_observed_at,
+        "public_available_at": provenance.public_available_at,
+        "strategy_usable_at": provenance.strategy_usable_at,
+        "availability_basis": provenance.availability_basis,
+        "availability_precision": provenance.availability_precision,
+        "strategy_usable_at_derivation": provenance.strategy_usable_at_derivation,
+        "source_revision": provenance.source_revision,
+        "knowledge_policy_version": provenance.knowledge_policy_version,
+        "payload_hash": provenance.payload_hash,
+    }
+
+
+def data_provenance_from_row(row: DataProvenanceRow) -> DataProvenance:
+    return DataProvenance(
+        provenance_id=row.provenance_id,
+        source_id=row.source_id,
+        dataset=row.dataset,
+        source_record_id=row.source_record_id,
+        timestamps=ProvenanceTimestamps(
+            event_at=row.event_at,
+            published_at=row.published_at,
+            retrieved_at=row.retrieved_at,
+            ingested_at=row.ingested_at,
+            system_first_observed_at=row.system_first_observed_at,
+        ),
+        public_available_at=row.public_available_at,
+        strategy_usable_at=row.strategy_usable_at,
+        availability_basis=row.availability_basis,
+        availability_precision=row.availability_precision,
+        strategy_usable_at_derivation=row.strategy_usable_at_derivation,
+        source_revision=row.source_revision,
+        knowledge_policy_version=row.knowledge_policy_version,
+        payload_hash=row.payload_hash,
+    )
+
+
+def data_value_to_values(value: DataValue) -> dict[str, Any]:
+    """Flatten a :class:`DataValue` onto the three ``data_revisions.value_*`` columns."""
+    return {
+        "value_kind": value.kind,
+        "value_text": value.text,
+        "value_unit": value.unit,
+        "value_precision_digits": value.precision_digits,
+    }
+
+
+def data_value_from_row(row: DataRevisionRow) -> DataValue:
+    return DataValue(
+        kind=row.value_kind,
+        text=row.value_text,
+        unit=row.value_unit,
+        precision_digits=row.value_precision_digits,
+    )
+
+
+def data_revision_to_values(revision: DataRevision) -> dict[str, Any]:
+    return {
+        "revision_id": revision.revision_id,
+        "logical_key": revision.logical_key,
+        "dataset": revision.dataset,
+        "source_id": revision.source_id,
+        "subject_symbol": revision.subject_symbol,
+        "revision_sequence": revision.revision_sequence,
+        **data_value_to_values(revision.value),
+        "period_start": revision.period_start,
+        "period_end": revision.period_end,
+        "effective_from": revision.effective_from,
+        "effective_to": revision.effective_to,
+        "provenance_id": revision.provenance_id,
+        "payload_hash": revision.payload_hash,
+        "source_revision": revision.source_revision,
+        "supersedes_revision_id": revision.supersedes_revision_id,
+        "ingested_at": revision.ingested_at,
+    }
+
+
+def data_revision_from_row(row: DataRevisionRow) -> DataRevision:
+    return DataRevision(
+        revision_id=row.revision_id,
+        logical_key=row.logical_key,
+        dataset=row.dataset,
+        source_id=row.source_id,
+        subject_symbol=row.subject_symbol,
+        revision_sequence=row.revision_sequence,
+        value=data_value_from_row(row),
+        period_start=row.period_start,
+        period_end=row.period_end,
+        effective_from=row.effective_from,
+        effective_to=row.effective_to,
+        provenance_id=row.provenance_id,
+        payload_hash=row.payload_hash,
+        source_revision=row.source_revision,
+        supersedes_revision_id=row.supersedes_revision_id,
+        ingested_at=row.ingested_at,
+    )
+
+
+def revision_invalidation_to_values(
+    invalidation: RevisionInvalidation,
+) -> dict[str, Any]:
+    return {
+        "invalidation_id": invalidation.invalidation_id,
+        "revision_id": invalidation.revision_id,
+        "reason": invalidation.reason,
+        "effective_at": invalidation.effective_at,
+        "recorded_at": invalidation.recorded_at,
+        "policy_version": invalidation.policy_version,
+        "decision_id": invalidation.decision_id,
+    }
+
+
+def revision_invalidation_from_row(
+    row: DataRevisionInvalidationRow,
+) -> RevisionInvalidation:
+    return RevisionInvalidation(
+        invalidation_id=row.invalidation_id,
+        revision_id=row.revision_id,
+        reason=row.reason,
+        effective_at=row.effective_at,
+        recorded_at=row.recorded_at,
+        policy_version=row.policy_version,
+        decision_id=row.decision_id,
+    )
+
+
+def ingestion_issue_id(
+    ingestion_id: str, ordinal: int, code: QualityIssueCode, logical_key: str | None
+) -> str:
+    """Deterministic child-row id: ``issue-<sha256(ingestion|ordinal|code|key)[:32]>``."""
+    material = f"{ingestion_id}|{ordinal}|{code.value}|{logical_key or ''}"
+    return f"issue-{hashlib.sha256(material.encode('utf-8')).hexdigest()[:32]}"
+
+
+def ingestion_issue_to_values(
+    ingestion_id: str, ordinal: int, issue: QualityIssue
+) -> dict[str, Any]:
+    return {
+        "issue_id": ingestion_issue_id(ingestion_id, ordinal, issue.code, issue.logical_key),
+        "ingestion_id": ingestion_id,
+        "ordinal": ordinal,
+        "code": issue.code,
+        "message": issue.message,
+        "logical_key": issue.logical_key,
+        "field": issue.field,
+    }
+
+
+def ingestion_issue_from_row(row: IngestionIssueRow) -> QualityIssue:
+    return QualityIssue(
+        code=row.code,
+        message=row.message,
+        logical_key=row.logical_key,
+        field=row.field,
+    )
+
+
+def ingestion_run_to_values(report: IngestionReport) -> dict[str, Any]:
+    return {
+        "ingestion_id": report.ingestion_id,
+        "dataset": report.dataset,
+        "source_id": report.source_id,
+        "started_at": report.started_at,
+        "finished_at": report.finished_at,
+        "received_rows": report.received_rows,
+        "accepted_rows": report.accepted_rows,
+        "incomplete_rows": report.incomplete_rows,
+        "rejected_rows": report.rejected_rows,
+        "duplicate_rows": report.duplicate_rows,
+        "status": report.status,
+        "provider_failure": report.provider_failure,
+        "failure_detail": report.failure_detail,
+        "payload_hash": report.payload_hash,
+    }
+
+
+def ingestion_report_from_row(
+    row: IngestionRunRow, issue_rows: Sequence[IngestionIssueRow]
+) -> IngestionReport:
+    return IngestionReport(
+        ingestion_id=row.ingestion_id,
+        dataset=row.dataset,
+        source_id=row.source_id,
+        started_at=row.started_at,
+        finished_at=row.finished_at,
+        received_rows=row.received_rows,
+        accepted_rows=row.accepted_rows,
+        incomplete_rows=row.incomplete_rows,
+        rejected_rows=row.rejected_rows,
+        duplicate_rows=row.duplicate_rows,
+        status=row.status,
+        provider_failure=row.provider_failure,
+        failure_detail=row.failure_detail,
+        issues=tuple(ingestion_issue_from_row(issue_row) for issue_row in issue_rows),
+        payload_hash=row.payload_hash,
+    )
+
+
+def provider_capabilities_to_values(
+    capabilities: ProviderCapabilities,
+) -> dict[str, Any]:
+    return {
+        "declaration_id": capabilities.declaration_id,
+        "provider_id": capabilities.provider_id,
+        "supported": sorted(item.value for item in capabilities.supported),
+        "dataset_versions": dict(capabilities.dataset_versions),
+        "declared_at": capabilities.declared_at,
+        "declaration_reason": capabilities.declaration_reason,
+        "notes": capabilities.notes,
+    }
+
+
+def provider_capabilities_from_row(
+    row: ProviderCapabilityRow,
+) -> ProviderCapabilities:
+    return ProviderCapabilities(
+        provider_id=row.provider_id,
+        supported=frozenset(DataCapability(value) for value in row.supported),
+        declared_at=row.declared_at,
+        declaration_reason=row.declaration_reason,
+        notes=row.notes,
+        dataset_versions=dict(row.dataset_versions),
+    )
+
+
+def loaded_revision_from_rows(
+    revision_row: DataRevisionRow, provenance_row: DataProvenanceRow
+) -> LoadedRevision:
+    """Bind a revision to its authorising provenance row."""
+    return LoadedRevision(
+        revision=data_revision_from_row(revision_row),
+        provenance=data_provenance_from_row(provenance_row),
     )

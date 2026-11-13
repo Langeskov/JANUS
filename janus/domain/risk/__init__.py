@@ -12,6 +12,7 @@ from janus.domain.risk.models import (
     RiskLimits,
     RiskPolicy,
     RiskRuleId,
+    RiskVerdict,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "RiskOutcome",
     "RiskPolicy",
     "RiskRuleId",
+    "RiskVerdict",
 ]

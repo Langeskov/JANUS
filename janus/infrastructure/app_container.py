@@ -34,6 +34,7 @@ from janus.application.container import (
 from janus.application.ports.clock import Clock, SystemClock
 from janus.application.ports.repositories import UnitOfWorkFactory
 from janus.application.services.accounting_service import AccountingService
+from janus.application.services.data_foundation_facade import DataFoundation
 from janus.application.services.portfolio_service import PortfolioService
 from janus.application.services.proposal_service import ProposalService
 from janus.application.services.risk_service import RiskService
@@ -125,6 +126,20 @@ class ConfiguredJanusContainer:
         self._gateway = gateway
         self._fill_model = fill_model
         self._eligibility = EligibilityPolicy(config.universe_policy())
+        # PR-001 data foundation: ingestion, provenance resolution and
+        # point-in-time queries share the same transactional boundary.
+        self._data_foundation = DataFoundation.from_uow_factory(
+            uow_factory=self._uow_factory, clock=self._clock
+        )
+
+    @property
+    def data_foundation(self) -> DataFoundation:
+        """Data-foundation use cases (PR-001).
+
+        Exposed as an additive attribute so the Phase 0 ``JanusContainer``
+        protocol and its CLI/API consumers are unchanged.
+        """
+        return self._data_foundation
 
     # ==================================================================
     # Lifecycle / health

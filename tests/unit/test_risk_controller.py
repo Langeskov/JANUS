@@ -54,6 +54,7 @@ from janus.domain.risk.models import (
     RiskLimits,
     RiskPolicy,
     RiskRuleId,
+    RiskVerdict,
 )
 
 ACCOUNT_ID = "janus-paper-cny-001"
@@ -254,7 +255,8 @@ def _build_intent(**overrides: object) -> OrderIntent:
 
 
 def _failed(decision: RiskDecision) -> set[RiskRuleId]:
-    return {check.rule_id for check in decision.checks if not check.passed}
+    """Rule ids whose verdict blocks approval (FAIL or INDETERMINATE)."""
+    return {check.rule_id for check in decision.checks if check.verdict.blocks}
 
 
 @pytest.fixture
@@ -806,7 +808,9 @@ def test_sector_attribution_unavailability_is_explicit(
         check for check in decision.checks if check.rule_id is RiskRuleId.SECTOR_EXPOSURE
     )
     assert sector_check.passed
+    assert sector_check.verdict is RiskVerdict.NOT_APPLICABLE
     assert sector_check.measured == "sector_attribution_unavailable"
+    assert RiskRuleId.SECTOR_EXPOSURE not in _failed(decision)
 
 
 def test_drawdown_pause_blocks_new_orders(

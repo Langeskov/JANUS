@@ -14,5 +14,6 @@ ADR and the old one is marked *Superseded by ADR-NNNN*.
 | [0006](0006-agent-boundary-and-prompt-injection.md) | Agent boundary: proposals only, untrusted external content | Accepted |
 | [0007](0007-sqlite-persistence-and-migrations.md) | SQLite persistence behind repository ports + Alembic | Accepted |
 | [0008](0008-additional-domain-packages.md) | Additional domain packages (`market_data`) and `tzdata` dependency | Accepted |
+| [0009](0009-temporal-data-model-and-point-in-time-semantics.md) | Temporal data model and point-in-time semantics | Accepted |
 
 New records use [`template.md`](template.md).

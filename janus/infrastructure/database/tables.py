@@ -46,10 +46,17 @@ from janus.domain.common.enums import (
     SecurityStatus,
 )
 from janus.domain.common.money import Money
+from janus.domain.data_foundation.availability import (
+    AvailabilityBasis,
+    AvailabilityPrecision,
+)
+from janus.domain.data_foundation.capabilities import DataSourceKind
+from janus.domain.data_foundation.quality import QualityIssueCode, QualityState
+from janus.domain.data_foundation.revisions import ValueKind
 from janus.domain.ledger.models import LedgerEntryType, PositionEventType
 from janus.domain.market_rules.models import FeeBasis
 from janus.domain.portfolio.models import AccountMode
-from janus.domain.risk.models import RiskRuleId
+from janus.domain.risk.models import RiskRuleId, RiskVerdict
 from janus.domain.strategy.decision import DecisionType
 from janus.infrastructure.database.columns import (
     DecimalText,
@@ -75,16 +82,24 @@ __all__ = [
     "AccountRow",
     "Base",
     "CashLedgerEntryRow",
+    "DataProvenanceRow",
+    "DataRevisionInvalidationRow",
+    "DataRevisionRow",
     "DataSnapshotRow",
+    "DataSourceRow",
     "DecisionRecordRow",
     "FeeLineRow",
     "FillRow",
+    "IngestionIssueRow",
+    "IngestionRunRow",
     "InstrumentRow",
     "MarketBarRow",
     "OrderRow",
     "PortfolioPositionRow",
     "PortfolioSnapshotRow",
     "PositionEventRow",
+    "ProviderCapabilityRow",
+    "RawPayloadRow",
     "RiskCheckRow",
     "RiskDecisionRow",
     "table_names",
@@ -399,6 +414,15 @@ class RiskCheckRow(Base):
     )
     check_index: Mapped[int] = mapped_column(Integer, primary_key=True)
     rule_id: Mapped[RiskRuleId] = mapped_column(enum_column(RiskRuleId), nullable=False)
+    verdict: Mapped[RiskVerdict] = mapped_column(
+        enum_column(RiskVerdict), nullable=False, server_default="PASS"
+    )
+    """Explicit PASS/FAIL/INDETERMINATE/NOT_APPLICABLE outcome.
+
+    ``server_default`` keeps pre-existing Phase 0 rows readable after the
+    ``0002_data_foundation`` migration adds the column.
+    """
+
     passed: Mapped[bool] = mapped_column(Boolean, nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False, default="")
     measured: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -551,6 +575,263 @@ class MarketBarRow(Base):
     effective_to: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
 
     __table_args__ = (Index("ix_market_bars_trade_date", "trade_date"),)
+
+
+# ---------------------------------------------------------------------------
+# Data foundation (PR-001): immutable provenance, revisions and ingestion audit
+# ---------------------------------------------------------------------------
+
+
+class DataSourceRow(Base):
+    """Registered origin of data (:class:`janus.domain.data_foundation.capabilities.DataSource`)."""
+
+    __tablename__ = "data_sources"
+
+    source_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    kind: Mapped[DataSourceKind] = mapped_column(enum_column(DataSourceKind), nullable=False)
+    display_name: Mapped[str] = mapped_column(Text, nullable=False)
+    registered_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+
+class RawPayloadRow(Base):
+    """Content-addressed archive of one provider response.
+
+    ``content_hash`` is UNIQUE: identical bytes can never create a second archive
+    entry, which is what makes raw-payload deduplication trustworthy.
+    """
+
+    __tablename__ = "raw_payloads"
+
+    payload_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    content_hash: Mapped[str] = mapped_column(Text(64), nullable=False, unique=True)
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    media_type: Mapped[str] = mapped_column(Text, nullable=False)
+    source_id: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("data_sources.source_id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    dataset: Mapped[str] = mapped_column(Text, nullable=False)
+    request_scope: Mapped[dict[str, str]] = mapped_column(JsonText, nullable=False, default=dict)
+    retrieved_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    ingested_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    payload_text: Mapped[str] = mapped_column(Text, nullable=False)
+
+    __table_args__ = (Index("ix_raw_payloads_source_dataset", "source_id", "dataset"),)
+
+
+class DataProvenanceRow(Base):
+    """Immutable provenance for one ingested source record."""
+
+    __tablename__ = "data_provenance"
+
+    provenance_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    source_id: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("data_sources.source_id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    dataset: Mapped[str] = mapped_column(Text, nullable=False)
+    source_record_id: Mapped[str] = mapped_column(Text, nullable=False)
+    event_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    retrieved_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    ingested_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    system_first_observed_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    public_available_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    strategy_usable_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    availability_basis: Mapped[AvailabilityBasis] = mapped_column(
+        enum_column(AvailabilityBasis), nullable=False
+    )
+    availability_precision: Mapped[AvailabilityPrecision] = mapped_column(
+        enum_column(AvailabilityPrecision), nullable=False
+    )
+    strategy_usable_at_derivation: Mapped[AvailabilityBasis] = mapped_column(
+        enum_column(AvailabilityBasis), nullable=False
+    )
+    source_revision: Mapped[str] = mapped_column(Text, nullable=False)
+    knowledge_policy_version: Mapped[str] = mapped_column(Text, nullable=False)
+    payload_hash: Mapped[str] = mapped_column(Text(64), nullable=False)
+
+    __table_args__ = (
+        # Provenance identity is **per ingestion attempt**: a re-ingestion of the
+        # same bytes at a later instant records a new, auditable provenance row,
+        # so ``ingested_at`` is part of the uniqueness key. An exact replay of the
+        # same attempt still collides here (and on the deterministic
+        # ``provenance_id`` primary key) and is deduplicated by the repository.
+        UniqueConstraint(
+            "source_id",
+            "dataset",
+            "source_record_id",
+            "source_revision",
+            "payload_hash",
+            "ingested_at",
+            name="uq_data_provenance_identity",
+        ),
+        Index(
+            "ix_data_provenance_dataset_usable",
+            "dataset",
+            "strategy_usable_at",
+        ),
+        Index("ix_data_provenance_payload_hash", "payload_hash"),
+    )
+
+
+class DataRevisionRow(Base):
+    """One immutable revision of one logical fact.
+
+    Two uniqueness rules protect point-in-time correctness:
+
+    * ``(logical_key, revision_sequence)`` — sequence slots are never reused;
+    * ``(logical_key, source_revision, payload_hash)`` — re-ingesting the same
+      source revision cannot create a phantom revision.
+    """
+
+    __tablename__ = "data_revisions"
+
+    revision_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    logical_key: Mapped[str] = mapped_column(Text, nullable=False)
+    dataset: Mapped[str] = mapped_column(Text, nullable=False)
+    source_id: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("data_sources.source_id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    subject_symbol: Mapped[str | None] = mapped_column(Text, nullable=True)
+    revision_sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    value_kind: Mapped[ValueKind] = mapped_column(enum_column(ValueKind), nullable=False)
+    value_text: Mapped[str] = mapped_column(Text, nullable=False)
+    value_unit: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_precision_digits: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    period_start: Mapped[date | None] = mapped_column(Date, nullable=True)
+    period_end: Mapped[date | None] = mapped_column(Date, nullable=True)
+    effective_from: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    effective_to: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    provenance_id: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("data_provenance.provenance_id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    payload_hash: Mapped[str] = mapped_column(Text(64), nullable=False)
+    source_revision: Mapped[str] = mapped_column(Text, nullable=False)
+    supersedes_revision_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ingested_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "logical_key", "revision_sequence", name="uq_data_revisions_logical_sequence"
+        ),
+        UniqueConstraint(
+            "logical_key",
+            "source_revision",
+            "payload_hash",
+            name="uq_data_revisions_identity",
+        ),
+        Index("ix_data_revisions_dataset_key", "dataset", "logical_key"),
+        Index("ix_data_revisions_dataset_symbol", "dataset", "subject_symbol"),
+        Index("ix_data_revisions_provenance", "provenance_id"),
+    )
+
+
+class DataRevisionInvalidationRow(Base):
+    """Append-only record that a revision must not be used from a given instant."""
+
+    __tablename__ = "data_revision_invalidations"
+
+    invalidation_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    revision_id: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("data_revisions.revision_id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    effective_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    policy_version: Mapped[str] = mapped_column(Text, nullable=False)
+    decision_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        Index(
+            "ix_data_revision_invalidations_revision_effective",
+            "revision_id",
+            "effective_at",
+        ),
+    )
+
+
+class IngestionRunRow(Base):
+    """Append-only ingestion attempt/report header.
+
+    ``source_id`` deliberately carries **no foreign key**: an ingestion run is an
+    append-only audit log that must be able to record a rejected attempt naming an
+    unregistered source (``UNKNOWN_SOURCE_IDENTITY``). Referential integrity for
+    accepted data is enforced by the ``raw_payloads`` and ``data_provenance``
+    foreign keys instead.
+    """
+
+    __tablename__ = "ingestion_runs"
+
+    ingestion_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    dataset: Mapped[str] = mapped_column(Text, nullable=False)
+    source_id: Mapped[str] = mapped_column(Text, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    finished_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    received_rows: Mapped[int] = mapped_column(Integer, nullable=False)
+    accepted_rows: Mapped[int] = mapped_column(Integer, nullable=False)
+    incomplete_rows: Mapped[int] = mapped_column(Integer, nullable=False)
+    rejected_rows: Mapped[int] = mapped_column(Integer, nullable=False)
+    duplicate_rows: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[QualityState] = mapped_column(enum_column(QualityState), nullable=False)
+    provider_failure: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    failure_detail: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    payload_hash: Mapped[str | None] = mapped_column(Text(64), nullable=True)
+
+    __table_args__ = (Index("ix_ingestion_runs_dataset_started", "dataset", "started_at"),)
+
+
+class IngestionIssueRow(Base):
+    """One structured data-quality finding attached to an ingestion run."""
+
+    __tablename__ = "ingestion_issues"
+
+    issue_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    ingestion_id: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("ingestion_runs.ingestion_id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    ordinal: Mapped[int] = mapped_column(Integer, nullable=False)
+    code: Mapped[QualityIssueCode] = mapped_column(enum_column(QualityIssueCode), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    logical_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    field: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("ingestion_id", "ordinal", name="uq_ingestion_issues_ingestion_ordinal"),
+    )
+
+
+class ProviderCapabilityRow(Base):
+    """One immutable provider capability declaration."""
+
+    __tablename__ = "provider_capabilities"
+
+    declaration_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    provider_id: Mapped[str] = mapped_column(Text, nullable=False)
+    supported: Mapped[list[str]] = mapped_column(JsonText, nullable=False, default=list)
+    dataset_versions: Mapped[dict[str, str]] = mapped_column(JsonText, nullable=False, default=dict)
+    declared_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    declaration_reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    __table_args__ = (
+        Index(
+            "ix_provider_capabilities_provider_declared",
+            "provider_id",
+            "declared_at",
+        ),
+    )
 
 
 def table_names() -> tuple[str, ...]:
